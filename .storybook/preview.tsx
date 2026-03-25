@@ -8,6 +8,11 @@ import "../src/global.css";
 
 const preview: Preview = {
   parameters: {
+    options: {
+      storySort: {
+        order: ["Design System", "ui"],
+      },
+    },
     controls: {
       matchers: {
         color: /(background|color)$/i,
