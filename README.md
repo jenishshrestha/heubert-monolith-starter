@@ -111,7 +111,7 @@ src/
 │   └── test/
 │       └── setup.ts            # Vitest setup
 │
-├── index.css                   # Tailwind + OKLch design tokens
+├── global.css                   # Tailwind + OKLch design tokens
 └── vite-env.d.ts               # Env type declarations
 ```
 

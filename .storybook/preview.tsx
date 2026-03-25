@@ -4,7 +4,7 @@ import { TooltipProvider } from "@shared/components/ui/Tooltip";
 import { withThemeByClassName } from "@storybook/addon-themes";
 import type { Preview } from "@storybook/react";
 
-import "../src/index.css";
+import "../src/global.css";
 
 const preview: Preview = {
   parameters: {

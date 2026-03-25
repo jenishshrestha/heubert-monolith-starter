@@ -2,7 +2,7 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import type { ErrorInfo, ReactNode } from "react";
 import { Component, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "../index.css";
+import "../global.css";
 import { useThemeStore } from "@shared/stores/theme-store";
 
 // Import the generated route tree

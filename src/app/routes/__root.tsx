@@ -1,3 +1,4 @@
+import { ThemeProvider } from "@shared/components/providers";
 import { queryClient } from "@shared/lib/query/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createRootRoute, Outlet, useRouter } from "@tanstack/react-router";
@@ -61,14 +62,16 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-background font-sans antialiased">
-        <Outlet />
-      </div>
-      <Suspense>
-        <ReactQueryDevtools initialIsOpen={false} />
-        <TanStackRouterDevtools position="bottom-right" />
-      </Suspense>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <div className="min-h-screen bg-background font-sans antialiased">
+          <Outlet />
+        </div>
+        <Suspense>
+          <ReactQueryDevtools initialIsOpen={false} />
+          <TanStackRouterDevtools position="bottom-left" />
+        </Suspense>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

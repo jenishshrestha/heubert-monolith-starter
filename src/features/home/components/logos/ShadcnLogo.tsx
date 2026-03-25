@@ -17,7 +17,7 @@ export function ShadcnLogo() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="32"
-        className="text-white"
+        className="text-foreground"
       />
       <line
         x1="192"
@@ -29,7 +29,7 @@ export function ShadcnLogo() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="32"
-        className="text-white"
+        className="text-foreground"
       />
     </svg>
   );
