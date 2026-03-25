@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "skills": {
+    "FDD-architecture": {
+      "source": "jenishshrestha/ai-skills",
+      "sourceType": "github",
+      "computedHash": "b4f74765311ddf7371f5155a7c2c178f1c985091427cf8d56c8f7f9188094d52"
+    },
+    "code-review": {
+      "source": "jenishshrestha/ai-skills",
+      "sourceType": "github",
+      "computedHash": "32981b0ffdf0746298b87c7c6de5f9ae8732b31a12a8095bdb6dc2c8d47badf2"
+    },
+    "tailwind-v4-best-practices": {
+      "source": "jenishshrestha/ai-skills",
+      "sourceType": "github",
+      "computedHash": "caf3ed9e589e235b0fd0ec0419b7cca6c7b85ead450591e3d7a3fb91e914231e"
+    },
+    "vercel-composition-patterns": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "f98931159fa9c7fed043bcd18a891a46dcf89ababa38df13a4c5b7b30dc0ce07"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "bbc31a48537b473ff4feea6360ef0de3bfdcbef26c14f4967a5deefe8ca801d3"
+    }
+  }
+}
