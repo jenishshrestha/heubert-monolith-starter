@@ -1,4 +1,14 @@
+import { AppHeader } from "@shared/components/layouts/AppHeader";
 import { ThemeProvider } from "@shared/components/providers";
+import { apiClient } from "@shared/lib/api/client";
+import {
+  applyMiddleware,
+  createAxiosProvider,
+  createRestAdapter,
+  DataProviderRegistry,
+  DataTableProvider,
+  loggingMiddleware,
+} from "@shared/lib/data-table";
 import { queryClient } from "@shared/lib/query/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createRootRoute, Outlet, useRouter } from "@tanstack/react-router";
@@ -9,6 +19,15 @@ const ReactQueryDevtools = import.meta.env.DEV
       import("@tanstack/react-query-devtools").then((m) => ({ default: m.ReactQueryDevtools })),
     )
   : () => null;
+
+// Legacy adapter (for existing mode:"api" tables)
+const dataTableAdapter = createRestAdapter();
+
+// New DataProvider (for mode:"provider" tables)
+const dataProvider = applyMiddleware(
+  import.meta.env.DEV ? [loggingMiddleware()] : [],
+  createAxiosProvider(apiClient),
+);
 
 const TanStackRouterDevtools = import.meta.env.DEV
   ? lazy(() =>
@@ -64,9 +83,14 @@ function RootComponent() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <div className="min-h-screen bg-background font-sans antialiased">
-          <Outlet />
-        </div>
+        <DataTableProvider adapter={dataTableAdapter}>
+          <DataProviderRegistry provider={dataProvider}>
+            <div className="min-h-screen bg-background font-sans antialiased">
+              <AppHeader />
+              <Outlet />
+            </div>
+          </DataProviderRegistry>
+        </DataTableProvider>
         <Suspense>
           <ReactQueryDevtools initialIsOpen={false} />
           <TanStackRouterDevtools position="bottom-left" />

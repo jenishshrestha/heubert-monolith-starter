@@ -79,6 +79,7 @@ bun run storybook
 | [Coding Principles](docs/coding-principles.md) | KISS, DRY, SOLID, YAGNI, Composition, Accessibility       |
 | [Git Guardrails](docs/git-guardrails.md)       | Automated quality checkpoints with examples and scenarios |
 | [AI Skills Guide](docs/ai-skills.md)           | How AI assistants are trained to follow project standards  |
+| [DataTable System](docs/data-table.md)         | Config-driven tables — providers, composition, all features |
 
 ## Project Structure
 

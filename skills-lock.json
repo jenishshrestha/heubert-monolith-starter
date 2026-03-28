@@ -4,17 +4,17 @@
     "FDD-architecture": {
       "source": "jenishshrestha/ai-skills",
       "sourceType": "github",
-      "computedHash": "b4f74765311ddf7371f5155a7c2c178f1c985091427cf8d56c8f7f9188094d52"
+      "computedHash": "8a4689593d9aa4aa652ac0c535868e0a4628a87f9780e89051a3b8457b5d13cc"
     },
     "code-review": {
       "source": "jenishshrestha/ai-skills",
       "sourceType": "github",
-      "computedHash": "32981b0ffdf0746298b87c7c6de5f9ae8732b31a12a8095bdb6dc2c8d47badf2"
+      "computedHash": "ec9b3142d1dcef056b577e28608dab21a7751099b8d3043c6731a523db2e5099"
     },
     "tailwind-v4-best-practices": {
       "source": "jenishshrestha/ai-skills",
       "sourceType": "github",
-      "computedHash": "caf3ed9e589e235b0fd0ec0419b7cca6c7b85ead450591e3d7a3fb91e914231e"
+      "computedHash": "7bcbf60299200945da357cca595b32db98446c09e6ebe50bc476c62ef28d833a"
     },
     "vercel-composition-patterns": {
       "source": "vercel-labs/agent-skills",
