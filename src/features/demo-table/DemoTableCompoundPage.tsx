@@ -1,10 +1,11 @@
 import { Button } from "@shared/components/ui/Button";
-import { DT, useDataTableContext } from "@shared/components/ui/DataTable";
 import {
   createRestProvider,
   createSelectionColumn,
+  DT,
   exportCurrentPage,
   exportSelectedRows,
+  useDataTableContext,
 } from "@shared/lib/data-table";
 import type { DataTableConfig } from "@shared/lib/data-table/data-table.types";
 import { DownloadIcon, TrashIcon } from "lucide-react";

@@ -1,5 +1,4 @@
 import { Button } from "@shared/components/ui/Button";
-
 import {
   DataTable,
   DataTableBulkBar,
@@ -10,8 +9,10 @@ import {
   DataTableSkeleton,
   DataTableToolbar,
   DataTableViewToggle,
-} from "@shared/components/ui/DataTable";
-import { exportCurrentPage, exportSelectedRows, useDataTable } from "@shared/lib/data-table";
+  exportCurrentPage,
+  exportSelectedRows,
+  useDataTable,
+} from "@shared/lib/data-table";
 import { DownloadIcon, TrashIcon } from "lucide-react";
 import { usersTableConfig } from "./api/users-table.config";
 import { userColumns } from "./lib/columns";
@@ -86,7 +87,9 @@ export function DemoTablePage() {
           ) : (
             <DataTableCardGrid
               table={table}
-              cardRenderer={usersTableConfig.cardRenderer!}
+              cardRenderer={
+                usersTableConfig.cardRenderer as NonNullable<typeof usersTableConfig.cardRenderer>
+              }
               isFetching={isFetching}
             />
           )}

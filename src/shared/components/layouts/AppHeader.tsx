@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@shared/components/ui/DropdownMenu";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
+import { Github, MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 const navLinks = [
@@ -68,7 +68,19 @@ export function AppHeader() {
             );
           })}
         </nav>
-        <ThemeSwitch />
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="size-8" asChild>
+            <a
+              href="https://github.com/jenishshrestha/heubert-monolith-starter"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub repository"
+            >
+              <Github className="size-4" />
+            </a>
+          </Button>
+          <ThemeSwitch />
+        </div>
       </div>
     </header>
   );

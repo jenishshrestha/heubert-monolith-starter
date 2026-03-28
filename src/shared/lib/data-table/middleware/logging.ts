@@ -1,4 +1,4 @@
-import type { DataProviderMiddleware } from "../provider/data-provider-middleware";
+import type { DataProviderMiddleware } from "../core/data-provider-middleware";
 
 /**
  * Logs resource name, timing, and row count for every getList call.

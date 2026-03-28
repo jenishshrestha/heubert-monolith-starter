@@ -1,5 +1,5 @@
-import type { DataProvider, GetListParams, GetListResponse } from "../provider/data-provider.types";
-import { resolveHeaders } from "../provider/utils";
+import type { DataProvider, GetListParams, GetListResponse } from "../core/data-provider.types";
+import { resolveHeaders } from "../core/utils";
 
 export interface GraphQLResourceConfig {
   /** The GraphQL query string. */

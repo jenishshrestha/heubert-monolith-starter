@@ -3,7 +3,7 @@
  * Features: Search, faceted filters on cuisine + difficulty, image column
  */
 import { Badge } from "@shared/components/ui/Badge";
-import { DataTableColumnHeader, DT } from "@shared/components/ui/DataTable";
+import { DataTableColumnHeader, DT } from "@shared/lib/data-table";
 import type { DataTableColumnDef, DataTableConfig } from "@shared/lib/data-table/data-table.types";
 import { ClockIcon } from "lucide-react";
 import type { Recipe } from "../demo-showcase.types";
@@ -84,6 +84,9 @@ const config: DataTableConfig<Recipe> = {
     },
     response: { dataPath: "recipes", totalPath: "total" },
   },
+  toolbar: {
+    search: { placeholder: "Search recipes..." },
+  },
   pagination: { defaultPageSize: 5, pageSizeOptions: [5, 10, 20] },
   enableSorting: true,
   syncWithUrl: false,
@@ -96,9 +99,7 @@ export function RecipesTable() {
         <code className="bg-muted rounded px-1 text-xs">mode: "api"</code> — Zero provider setup,
         inline config only. Server-side search via DummyJSON.
       </p>
-      <DT.Toolbar>
-        <DT.Search placeholder="Search recipes..." />
-      </DT.Toolbar>
+      <DT.Toolbar />
       <DT.Content />
       <DT.Pagination />
     </DT.Root>

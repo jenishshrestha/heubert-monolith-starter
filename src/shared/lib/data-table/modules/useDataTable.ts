@@ -1,0 +1,96 @@
+import { useMemo } from "react";
+import type { DataTableConfig, UseDataTableReturn } from "../types/data-table.types";
+import { useDataSource } from "./useDataSource";
+import { useServerData } from "./useServerData";
+import { useTableInstance } from "./useTableInstance";
+import { useTableState } from "./useTableState";
+import { useViewState } from "./useViewState";
+
+export function useDataTable<TData>(config: DataTableConfig<TData>): UseDataTableReturn<TData> {
+  const {
+    columns = [],
+    cardRenderer,
+    dataSource: rawDataSource,
+    pagination: paginationConfig,
+    enableSorting = true,
+    enableRowSelection = false,
+    enableMultiSort = false,
+    syncWithUrl = true,
+  } = config;
+
+  const defaultPageSize = paginationConfig?.defaultPageSize ?? 10;
+
+  // 1. View state
+  const { view, setView, availableViews } = useViewState({
+    columns,
+    cardRenderer,
+    defaultView: config.defaultView,
+  });
+
+  // 2. Resolve data source (provider/api/server/client)
+  const dataSource = useDataSource(rawDataSource);
+
+  // 3. All table state (pagination, sorting, filters, search)
+  const state = useTableState({
+    syncWithUrl,
+    defaultPageSize,
+    urlParamPrefix: config.urlParamPrefix,
+  });
+
+  // 4. Server-side data fetching (noop for client mode)
+  const serverData = useServerData({
+    dataSource,
+    pagination: state.pagination,
+    sorting: state.sorting,
+    columnFilters: state.columnFilters,
+    globalFilter: state.globalFilter,
+  });
+
+  // 5. TanStack Table instance
+  const { table } = useTableInstance({
+    columns,
+    data: serverData.data,
+    totalRows: serverData.totalRows,
+    pageCount: serverData.pageCount,
+    isServer: dataSource.mode === "server",
+    state,
+    enableSorting,
+    enableMultiSort,
+    enableRowSelection,
+  });
+
+  const isEmpty = !serverData.isLoading && serverData.data.length === 0;
+
+  return useMemo(
+    () => ({
+      table,
+      isLoading: serverData.isLoading,
+      isFetching: serverData.isFetching,
+      isEmpty,
+      data: serverData.data,
+      totalRows: serverData.totalRows,
+      globalFilter: state.globalFilter,
+      setGlobalFilter: state.setGlobalFilter,
+      view,
+      setView,
+      availableViews,
+      hasNextPage: serverData.hasNextPage,
+      hasPreviousPage: serverData.hasPreviousPage,
+    }),
+    [
+      table,
+      serverData.isLoading,
+      serverData.isFetching,
+      isEmpty,
+      serverData.data,
+      serverData.totalRows,
+      state.globalFilter,
+      state.setGlobalFilter,
+      view,
+      setView,
+      availableViews,
+      serverData.hasNextPage,
+      serverData.hasPreviousPage,
+    ],
+  );
+}

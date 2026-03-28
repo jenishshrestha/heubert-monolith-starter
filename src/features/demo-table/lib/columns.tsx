@@ -1,8 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@shared/components/ui/Avatar";
 import { Badge } from "@shared/components/ui/Badge";
-import type { RowAction } from "@shared/components/ui/DataTable";
-import { DataTableColumnHeader, DataTableRowActions } from "@shared/components/ui/DataTable";
-import type { DataTableColumnDef } from "@shared/lib/data-table";
+import type { DataTableColumnDef, RowAction } from "@shared/lib/data-table";
+import { DataTableColumnHeader, DataTableRowActions } from "@shared/lib/data-table";
 import { CopyIcon, EyeIcon, PencilIcon, TrashIcon } from "lucide-react";
 import type { User } from "../demo-table.types";
 

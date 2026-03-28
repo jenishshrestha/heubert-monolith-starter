@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { DataProvider } from "../provider/data-provider.types";
+import type { DataProvider } from "../core/data-provider.types";
 import { createRestProvider, type RestProviderOptions } from "./rest-provider";
 
 export interface AxiosProviderOptions extends Omit<RestProviderOptions, "httpClient"> {
