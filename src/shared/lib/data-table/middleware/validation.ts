@@ -1,4 +1,4 @@
-import type { DataProviderMiddleware } from "../provider/data-provider-middleware";
+import type { DataProviderMiddleware } from "../core/data-provider-middleware";
 
 /**
  * Validates each row in the response against a Zod schema.

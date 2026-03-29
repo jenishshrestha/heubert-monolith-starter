@@ -4,8 +4,8 @@ import type {
   GetListParams,
   GetListResponse,
   SortField,
-} from "../provider/data-provider.types";
-import { getByPath, resolveHeaders } from "../provider/utils";
+} from "../core/data-provider.types";
+import { getByPath, resolveHeaders } from "../core/utils";
 
 // ---- Mapping config types ----
 
@@ -99,7 +99,7 @@ function buildSortParams(sort: SortField[], mapping: RestSortMapping): Record<st
 
   switch (mapping.style) {
     case "flat": {
-      const first = sort[0]!;
+      const first = sort[0] as (typeof sort)[0];
       return {
         [mapping.sortByParam ?? "sortBy"]: first.field,
         [mapping.orderParam ?? "order"]:

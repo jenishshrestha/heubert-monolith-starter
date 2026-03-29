@@ -10,8 +10,8 @@
  * - Stable, read-only dataset (no sandbox mutation)
  */
 import { Badge } from "@shared/components/ui/Badge";
-import { DataTableColumnHeader, DT } from "@shared/components/ui/DataTable";
 import type { DataProvider, GetListResponse } from "@shared/lib/data-table";
+import { DataTableColumnHeader, DT } from "@shared/lib/data-table";
 import type { DataTableColumnDef, DataTableConfig } from "@shared/lib/data-table/data-table.types";
 
 // ---- Types ----
@@ -198,8 +198,15 @@ const config: DataTableConfig<Character> = {
     provider: rickAndMortyProvider,
     paginationType: "page",
   },
+  toolbar: {
+    search: { placeholder: "Search characters..." },
+    filters: [
+      { column: "status", type: "single-select", options: statusOptions },
+      { column: "gender", type: "single-select", options: genderOptions },
+    ],
+  },
   pagination: { defaultPageSize: 20, pageSizeOptions: [20] },
-  enableSorting: false, // Rick and Morty API doesn't support sorting
+  enableSorting: false,
   syncWithUrl: false,
 };
 
@@ -214,11 +221,7 @@ export function CharactersTable() {
         <code className="bg-muted rounded px-1 text-xs">?status=Alive&gender=Male</code>. Stable
         dataset, 826 characters.
       </p>
-      <DT.Toolbar>
-        <DT.Search placeholder="Search characters..." />
-        <DT.SingleFilter column="status" title="Status" options={statusOptions} />
-        <DT.SingleFilter column="gender" title="Gender" options={genderOptions} />
-      </DT.Toolbar>
+      <DT.Toolbar />
       <DT.Content />
       <DT.Pagination />
     </DT.Root>

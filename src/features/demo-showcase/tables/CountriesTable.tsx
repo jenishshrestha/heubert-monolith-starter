@@ -3,7 +3,7 @@
  * Features: Client-side search, sort, filter — no server requests after initial load
  */
 import { Badge } from "@shared/components/ui/Badge";
-import { DataTableColumnHeader, DT } from "@shared/components/ui/DataTable";
+import { DataTableColumnHeader, DT } from "@shared/lib/data-table";
 import type { DataTableColumnDef, DataTableConfig } from "@shared/lib/data-table/data-table.types";
 import { useQuery } from "@tanstack/react-query";
 import type { Country } from "../demo-showcase.types";
@@ -95,6 +95,9 @@ function useCountries() {
       const res = await fetch(
         "https://restcountries.com/v3.1/all?fields=name,capital,region,population,flags,languages",
       );
+      if (!res.ok) {
+        throw new Error(`Failed to fetch countries: ${res.status}`);
+      }
       return res.json() as Promise<Country[]>;
     },
     staleTime: 1000 * 60 * 60, // 1 hour — data rarely changes
@@ -102,7 +105,7 @@ function useCountries() {
 }
 
 export function CountriesTable() {
-  const { data: countries = [], isLoading } = useCountries();
+  const { data: countries = [], isLoading, error } = useCountries();
 
   const config: DataTableConfig<Country> = {
     columns,
@@ -110,10 +113,26 @@ export function CountriesTable() {
       mode: "client",
       data: countries,
     },
+    toolbar: {
+      search: { placeholder: "Search countries..." },
+      filters: [
+        { column: "region", type: "multi-select", options: regionOptions },
+        { column: "population", type: "range", min: 0, max: 1500000000, step: 1000000 },
+      ],
+      columnToggle: true,
+    },
     pagination: { defaultPageSize: 10, pageSizeOptions: [10, 25, 50, 100] },
     enableSorting: true,
     syncWithUrl: false,
   };
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-destructive text-sm">Failed to load countries: {error.message}</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -131,18 +150,7 @@ export function CountriesTable() {
         countries loaded once. All search, sort, filter happens client-side. Zero API calls after
         initial load.
       </p>
-      <DT.Toolbar>
-        <DT.Search placeholder="Search countries..." />
-        <DT.Filter column="region" title="Region" options={regionOptions} />
-        <DT.RangeFilter
-          column="population"
-          title="Population"
-          min={0}
-          max={1500000000}
-          step={1000000}
-        />
-        <DT.ViewOptions />
-      </DT.Toolbar>
+      <DT.Toolbar />
       <DT.Content />
       <DT.Pagination />
     </DT.Root>

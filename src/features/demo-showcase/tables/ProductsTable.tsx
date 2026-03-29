@@ -10,8 +10,8 @@
  * - Price range filtering via ?price_min=X&price_max=X
  */
 import { Badge } from "@shared/components/ui/Badge";
-import { DataTableColumnHeader, DT } from "@shared/components/ui/DataTable";
 import type { DataProvider, GetListResponse } from "@shared/lib/data-table";
+import { DataTableColumnHeader, DT } from "@shared/lib/data-table";
 import type { DataTableColumnDef, DataTableConfig } from "@shared/lib/data-table/data-table.types";
 import { useQuery } from "@tanstack/react-query";
 import type { PlatziCategory, PlatziProduct } from "../demo-showcase.types";
@@ -25,6 +25,9 @@ function useCategoryOptions() {
     queryKey: ["platzi-categories"],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/categories`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch categories: ${res.status}`);
+      }
       const categories: PlatziCategory[] = await res.json();
       return categories.map((c) => ({ label: c.name, value: String(c.id) }));
     },
@@ -148,15 +151,23 @@ const config: DataTableConfig<PlatziProduct> = {
     provider: platziProvider,
     paginationType: "offset",
   },
+  toolbar: {
+    search: { placeholder: "Search by title..." },
+    // Category filter added dynamically via children (options fetched from API)
+  },
   pagination: { defaultPageSize: 5, pageSizeOptions: [5, 10, 20] },
-  enableSorting: false, // Platzi API doesn't support sorting
+  enableSorting: false,
   syncWithUrl: false,
 };
 
 // ---- Component ----
 
 export function ProductsTable() {
-  const { data: categoryOptions = [], isLoading: categoriesLoading } = useCategoryOptions();
+  const {
+    data: categoryOptions = [],
+    isLoading: categoriesLoading,
+    error: categoriesError,
+  } = useCategoryOptions();
 
   return (
     <DT.Root config={config} className="space-y-4">
@@ -165,7 +176,11 @@ export function ProductsTable() {
         DataProvider for Platzi API. Category filter fetched from{" "}
         <code className="bg-muted rounded px-1 text-xs">GET /categories</code> and applied
         server-side via <code className="bg-muted rounded px-1 text-xs">?categoryId=X</code>.
-        {categoriesLoading ? " Loading categories..." : ` ${categoryOptions.length} categories.`}
+        {categoriesError
+          ? " Failed to load categories."
+          : categoriesLoading
+            ? " Loading categories..."
+            : ` ${categoryOptions.length} categories.`}
       </p>
       <DT.Toolbar>
         <DT.Search placeholder="Search by title..." />

@@ -1,5 +1,5 @@
-import { normalizeError } from "../provider/data-provider-error";
-import type { DataProviderMiddleware } from "../provider/data-provider-middleware";
+import { normalizeError } from "../core/data-provider-error";
+import type { DataProviderMiddleware } from "../core/data-provider-middleware";
 
 /**
  * Catches any thrown error and wraps it in a standardized DataProviderError.

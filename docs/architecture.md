@@ -72,10 +72,12 @@ src/features/contacts/
 ```
 src/shared/
 ├── components/
-│   ├── ui/              ← 56 ready-to-use building blocks
+│   ├── ui/              ← Primitive UI components (shadcn: Button, Input, etc.)
+│   ├── layouts/         ← Layout wrappers (Header, Sidebar)
 │   └── providers/       ← App-wide settings (theme, etc.)
 ├── hooks/               ← Reusable logic
-├── lib/                 ← Utilities and configurations
+├── lib/                 ← Utilities, configurations, and libraries
+│   └── data-table/      ← DataTable system (see docs/data-table.md)
 ├── stores/              ← App-wide state management
 ├── types/               ← Shared data definitions
 └── test/                ← Test configuration

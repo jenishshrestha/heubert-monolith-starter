@@ -339,77 +339,200 @@ function MyInfiniteScroll() {
 
 ---
 
-## Modular Feature System
+## Modular Hook System (`modules/`)
 
-### Feature Module Structure
+### Philosophy
 
-Each feature = **hook (logic)** + **component (UI)** + **config (options)**
+`useDataTable` was a 259-line monolith. It is now a **thin orchestrator** (~50 lines) that composes 5 focused hooks, each owning a single concern. The compound UI components (`DT.*`) remain unchanged — they consume the same `UseDataTableReturn` contract.
 
-```
-features/
-├── search/
-│   ├── index.ts
-│   ├── useSearch.ts              # manages search state
-│   └── DataTableSearch.tsx       # debounced search input UI
-├── filter/
-│   ├── index.ts
-│   ├── useFilter.ts             # manages filter state per column
-│   └── DataTableFilter.tsx      # faceted filter UI
-├── pagination/
-│   ├── index.ts
-│   ├── usePagination.ts         # manages page/cursor state
-│   └── DataTablePagination.tsx  # numbered pages / prev-next UI
-├── sorting/
-│   ├── index.ts
-│   ├── useSorting.ts            # manages sort state
-│   └── DataTableColumnHeader.tsx # sortable header UI
-├── selection/
-│   ├── index.ts
-│   ├── useSelection.ts          # manages row selection state
-│   └── selection-column.tsx     # checkbox column factory
-├── export/
-│   ├── index.ts
-│   ├── useExport.ts             # CSV export logic
-│   └── DataTableExport.tsx      # export button UI
-├── bulk-actions/
-│   ├── index.ts
-│   ├── useBulkActions.ts        # manages bulk state
-│   └── DataTableBulkBar.tsx     # floating action bar UI
-├── view-toggle/
-│   ├── index.ts
-│   ├── useViewToggle.ts         # manages table/card view state
-│   └── DataTableViewToggle.tsx  # toggle buttons UI
-└── column-visibility/
-    ├── index.ts
-    ├── useColumnVisibility.ts   # manages column show/hide
-    └── DataTableViewOptions.tsx # column picker dropdown UI
-```
-
-### Feature Independence
-
-Features communicate through **shared context only** — no direct imports between features.
+### Module Structure
 
 ```
-                    ┌─────────────────┐
-                    │  DataTable.Root  │ (provides context)
-                    └────────┬────────┘
-                             │
-         ┌───────────┬───────┼────────┬──────────────┐
-         │           │       │        │              │
-    ┌────▼───┐  ┌───▼──┐ ┌──▼───┐ ┌──▼────┐  ┌─────▼──────┐
-    │ Search │  │Filter│ │ Sort │ │ View  │  │ Pagination │
-    └────────┘  └──────┘ └──────┘ │Toggle │  └────────────┘
-                                  └───────┘
-    ┌─────────┐              ┌──────────┐
-    │Selection│──────────────▶│BulkBar  │
-    └─────────┘  (BulkBar    └──────────┘
-                  reads selectedRows
-                  from context — if
-                  Selection not present,
-                  count is 0, bar hidden)
+src/shared/lib/data-table/modules/
+├── index.ts                  # barrel export
+├── useViewState.ts           # ~25 lines — available views + view toggle
+├── useDataSource.ts          # ~40 lines — provider/api/server/client resolution + cursor map
+├── useTableState.ts          # ~70 lines — pagination, sorting, filters, search (URL or local)
+├── useServerData.ts          # ~40 lines — query execution + loading/pagination flags
+└── useTableInstance.ts       # ~60 lines — column visibility, row selection, useReactTable wiring
 ```
 
-**Graceful degradation:** BulkBar reads `table.getFilteredSelectedRowModel()` from context. If Selection isn't enabled (no checkbox column), BulkBar shows nothing — no crash, no error.
+### Composition Flow
+
+```
+useDataTable(config)                    ← thin orchestrator (~50 lines)
+  │
+  ├── useViewState(...)                 ← view, setView, availableViews
+  │
+  ├── useDataSource(...)                ← resolves raw config → { mode, queryKey, queryFn, data }
+  │
+  ├── useTableState(...)                ← pagination, sorting, filters, search (URL or local)
+  │
+  ├── useServerData(...)                ← executes query (or returns client data), derives flags
+  │
+  └── useTableInstance(...)             ← column visibility, row selection, useReactTable()
+        │
+        └── returns Table<TData>
+```
+
+### Module Details
+
+| Module | State Owned | Dependencies | Key Design Note |
+|--------|-------------|--------------|-----------------|
+| `useViewState` | `view` (useState), `availableViews` (useMemo) | None | Simplest module, zero cross-deps |
+| `useDataSource` | `cursorMapRef` (useRef) | `useDataTableAdapter()`, `useDataProvider()`, `resolveDataSource`, `resolveProviderDataSource` | Owns cursor map because it's tied to provider resolution |
+| `useTableState` | pagination, sorting, filters, search (useState × 4) | `useDataTableSearchParams` | Encapsulates `syncWithUrl` entirely — no other module knows about it. Page-reset-on-change is trivial because setters share scope |
+| `useServerData` | None (delegates to `useDataTableQuery`) | `useDataTableQuery` | Client mode returns static values. Owns `noopQueryFn` |
+| `useTableInstance` | `columnVisibility` (useState), `rowSelection` (useState) | `@tanstack/react-table` | Receives everything via params, calls `useReactTable` |
+
+### Why 5 Modules (Not 9 Per-Feature)
+
+Splitting into per-feature hooks (usePagination, useSorting, useFilter, useSearch) would create **circular dependencies** for the page-reset-on-change behavior: sorting/filter/search changes must reset pagination to page 0. Additionally, `useDataTableSearchParams` returns all 4 state values as a bundle — it can't be split across hooks. One `useTableState` module keeps this logic clean.
+
+### What Does NOT Move Into `modules/`
+
+| File | Reason |
+|------|--------|
+| `useDataTableQuery.ts` | General React Query wrapper, consumed by `useServerData` |
+| `useDataTableSearchParams.ts` | TanStack Router integration, consumed by `useTableState` |
+| `resolveDataSource.ts` | Pure function, consumed by `useDataSource` |
+| `provider/resolveProviderDataSource.ts` | Pure function, consumed by `useDataSource` |
+| `export-csv.ts` | Standalone utility, not part of useDataTable |
+| `selection-column.tsx` | Standalone factory, not part of useDataTable |
+
+---
+
+## Router Adapter System
+
+### Problem
+
+The library's URL sync (`syncWithUrl: true`) was hard-coupled to TanStack Router via `useDataTableSearchParams.ts`. This prevented use with Next.js, React Router, or any other framework.
+
+### Solution
+
+A pluggable `RouterAdapter` interface that abstracts URL read/write operations. The adapter is framework-specific (~15 lines per framework); all serialization logic stays in the library.
+
+### Adapter Interface
+
+```typescript
+interface RouterAdapter {
+  useSearchParams: () => RouterSearchParamsReturn;
+}
+
+interface RouterSearchParamsReturn {
+  /** Current URL search params as flat key-value map */
+  getParams: () => Record<string, unknown>;
+  /** Merge updates into URL params. undefined = remove key. Replaces history entry. */
+  setParams: (updates: Record<string, unknown>) => void;
+}
+```
+
+The adapter doesn't know about pagination, sorting, or filters. It only moves flat key-value pairs to/from the URL. Serialization (`"name.asc"`, JSON filters) is handled by `router/serialization.ts`.
+
+### How It Works
+
+```
+useDataTable(config)
+  → useTableState({ syncWithUrl: true })
+    → useRouterAdapter()           ← reads adapter from context
+    → useUrlSyncedState(adapter)   ← generic URL sync (no router imports)
+      → adapter.useSearchParams()  ← framework-specific read/write
+      → serialization.ts           ← parse/serialize sort, filters
+```
+
+When `syncWithUrl: false` or no adapter provided: falls back to local React state. Dev warning if `syncWithUrl: true` but no adapter.
+
+### Noop Adapter (Hooks Rules)
+
+React hooks must be called unconditionally. When URL sync is off, a noop adapter is used:
+
+```typescript
+const noopAdapter: RouterAdapter = {
+  useSearchParams: () => ({
+    getParams: () => ({}),
+    setParams: () => {},
+  }),
+};
+```
+
+### Built-in: TanStack Router Adapter
+
+```typescript
+export function createTanStackRouterAdapter(): RouterAdapter {
+  return {
+    useSearchParams() {
+      const search = useSearch({ strict: false }) as Record<string, unknown>;
+      const navigate = useNavigate();
+      return {
+        getParams: () => search,
+        setParams: (updates) => {
+          void navigate({
+            search: ((prev) => ({ ...prev, ...updates })) as never,
+            replace: true,
+          });
+        },
+      };
+    },
+  };
+}
+```
+
+### Example: Next.js Adapter
+
+```typescript
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import type { RouterAdapter } from "@shared/lib/data-table";
+
+export const nextJsRouterAdapter: RouterAdapter = {
+  useSearchParams() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+    return {
+      getParams: () => Object.fromEntries(searchParams.entries()),
+      setParams: (updates) => {
+        const params = new URLSearchParams(searchParams.toString());
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === undefined) params.delete(key);
+          else params.set(key, String(value));
+        }
+        router.replace(`${pathname}?${params.toString()}`);
+      },
+    };
+  },
+};
+```
+
+### App Wiring
+
+```tsx
+// __root.tsx
+import { createTanStackRouterAdapter, RouterAdapterProvider } from "@shared/lib/data-table";
+
+const routerAdapter = createTanStackRouterAdapter();
+
+function RootComponent() {
+  return (
+    <RouterAdapterProvider adapter={routerAdapter}>
+      <DataProviderRegistry provider={dataProvider}>
+        {/* ... */}
+      </DataProviderRegistry>
+    </RouterAdapterProvider>
+  );
+}
+```
+
+### URL Parameter Format (unchanged)
+
+| Param | Format | Example |
+|-------|--------|---------|
+| `page` | number (0-indexed) | `?page=2` |
+| `pageSize` | number | `?pageSize=20` |
+| `sort` | `"id.asc"` or `"id.desc"` | `?sort=name.asc` |
+| `filters` | JSON string | `?filters=[{"id":"status","value":"active"}]` |
+| `search` | string | `?search=john` |
+
+Prefix support: `?users_page=1&orders_page=2` for multi-table pages.
 
 ---
 
@@ -603,95 +726,89 @@ function SimpleTable() {
 
 ## File Structure
 
+Everything lives in `src/shared/lib/data-table/` — a fully self-contained library.
+
 ```
 src/shared/lib/data-table/
-├── index.ts                              # barrel (updated)
-├── data-table.types.ts                   # MODIFIED: add ProviderDataSource, FilterOperator
-├── data-table.schema.ts                  # unchanged
+├── index.ts                    # single barrel export for consumers
 │
-├── provider/                             # NEW — Core provider system
+├── components/                 # UI components (each has prop-based + compound wrapper)
+│   ├── index.ts                #   barrel + DT namespace definition
+│   ├── DataTable.tsx           #   core table renderer
+│   ├── DataTableSearch.tsx     #   debounced search input
+│   ├── DataTablePagination.tsx #   page numbers + page size
+│   ├── DataTableColumnHeader.tsx # sortable column header
+│   ├── DataTableFacetedFilter.tsx # multi-select filter
+│   ├── DataTableSingleFilter.tsx  # single-select filter
+│   ├── DataTableRangeFilter.tsx   # min/max range filter
+│   ├── DataTableAdvancedFilter.tsx # sheet-based filter panel
+│   ├── DataTableFilterTags.tsx    # active filter chips
+│   ├── DataTableViewToggle.tsx    # table/card view switch
+│   ├── DataTableViewOptions.tsx   # column visibility dropdown
+│   ├── DataTableBulkBar.tsx       # floating bulk action bar
+│   ├── DataTableRowActions.tsx    # per-row action dropdown
+│   ├── DataTableCardGrid.tsx      # card grid layout
+│   ├── DataTableToolbar.tsx       # toolbar (auto + manual)
+│   ├── DataTableEmpty.tsx         # empty state
+│   ├── DataTableSkeleton.tsx      # loading skeleton
+│   ├── DataTableContext.tsx       # 4 React contexts for perf
+│   ├── DataTableRoot.tsx          # root provider component
+│   ├── DataTableContent.tsx       # smart content renderer
+│   └── selection-column.tsx       # checkbox column factory
+│
+├── modules/                    # hook decomposition (useDataTable internals)
 │   ├── index.ts
-│   ├── data-provider.types.ts            # DataProvider, GetListParams, GetListResponse
-│   ├── data-provider-error.ts            # DataProviderError, normalizeError
-│   ├── data-provider-middleware.ts        # DataProviderMiddleware, applyMiddleware
-│   ├── DataProviderRegistry.tsx          # Context + useDataProvider hook
-│   └── resolveProviderDataSource.ts      # mode:"provider" → queryFn
+│   ├── useDataTable.ts         #   main hook (thin orchestrator)
+│   ├── useDataTableQuery.ts    #   React Query wrapper
+│   ├── useViewState.ts         #   view toggle state
+│   ├── useDataSource.ts        #   data source resolution
+│   ├── useTableState.ts        #   pagination/sort/filter/search state
+│   ├── useServerData.ts        #   server query + loading flags
+│   └── useTableInstance.ts     #   TanStack Table wiring
 │
-├── providers/                            # NEW — Built-in implementations
+├── core/                       # provider framework + legacy adapters
 │   ├── index.ts
-│   ├── rest-provider.ts                  # createRestProvider (fetch-based)
-│   ├── axios-provider.ts                 # createAxiosProvider (Axios wrapper)
-│   ├── graphql-provider.ts               # createGraphQLProvider
-│   └── legacy-adapter-bridge.ts          # old DataTableAdapter → DataProvider
+│   ├── DataProviderRegistry.tsx #  global provider context
+│   ├── DataTableProvider.tsx    #  legacy adapter context
+│   ├── data-provider.types.ts   #  DataProvider interface
+│   ├── data-provider-error.ts   #  error normalization
+│   ├── data-provider-middleware.ts # middleware composition
+│   ├── createRestAdapter.ts     #  legacy REST adapter factory
+│   ├── resolveDataSource.ts     #  mode:"api" resolver
+│   ├── resolveProviderDataSource.ts # mode:"provider" resolver
+│   └── utils.ts                 #  path/header helpers
 │
-├── middleware/                            # NEW — Built-in middleware
+├── providers/                  # built-in provider implementations
+│   ├── index.ts
+│   ├── rest-provider.ts        #   fetch-based REST
+│   ├── axios-provider.ts       #   Axios wrapper
+│   ├── graphql-provider.ts     #   GraphQL
+│   └── legacy-adapter-bridge.ts #  backwards compat bridge
+│
+├── middleware/                  # built-in middleware
 │   ├── index.ts
 │   ├── logging.ts
 │   ├── error-normalizer.ts
 │   ├── retry.ts
 │   └── validation.ts
 │
-├── features/                             # NEW — Modular feature hooks
+├── router/                     # framework-agnostic URL sync
 │   ├── index.ts
-│   ├── search/
-│   │   ├── index.ts
-│   │   └── useSearch.ts
-│   ├── filter/
-│   │   ├── index.ts
-│   │   └── useFilter.ts
-│   ├── pagination/
-│   │   ├── index.ts
-│   │   └── usePagination.ts
-│   ├── sorting/
-│   │   ├── index.ts
-│   │   └── useSorting.ts
-│   ├── selection/
-│   │   ├── index.ts
-│   │   └── useSelection.ts
-│   ├── export/
-│   │   ├── index.ts
-│   │   └── useExport.ts
-│   ├── bulk-actions/
-│   │   ├── index.ts
-│   │   └── useBulkActions.ts
-│   ├── view-toggle/
-│   │   ├── index.ts
-│   │   └── useViewToggle.ts
-│   └── column-visibility/
-│       ├── index.ts
-│       └── useColumnVisibility.ts
+│   ├── router-adapter.types.ts #   RouterAdapter interface
+│   ├── RouterAdapterProvider.tsx #  context for adapter
+│   ├── tanstack-router-adapter.ts # TanStack Router impl
+│   ├── useUrlSyncedState.ts    #   generic URL-synced state
+│   ├── useDataTableSearchParams.ts # deprecated compat wrapper
+│   └── serialization.ts        #   sort/filter URL encoding
 │
-├── resolveDataSource.ts                  # UNCHANGED (backwards compat)
-├── createRestAdapter.ts                  # UNCHANGED (backwards compat)
-├── DataTableProvider.tsx                 # UNCHANGED (backwards compat)
-├── useDataTable.ts                       # MODIFIED: add mode:"provider" + cursor state
-├── useDataTableQuery.ts                  # MODIFIED: handle cursor pagination
-├── useDataTableSearchParams.ts           # MODIFIED: cursor-aware URL serialization
-├── export-csv.ts                         # unchanged
-└── selection-column.tsx                  # unchanged
-
-src/shared/components/ui/DataTable/
-├── index.ts                              # UPDATED — exports compound namespace
-├── compound/                             # NEW — Compound composition wrappers
-│   ├── index.ts
-│   ├── DataTableContext.tsx              # context type + provider + useDataTableContext
-│   ├── DataTableRoot.tsx                # calls useDataTable, provides context
-│   ├── DataTableContent.tsx             # auto loading/empty/table/card
-│   └── DataTableCompoundToolbar.tsx     # reads context, renders children
+├── types/
+│   └── data-table.types.ts     # central type definitions
 │
-├── DataTable.tsx                         # UNCHANGED
-├── DataTableColumnHeader.tsx             # UNCHANGED
-├── DataTablePagination.tsx               # UNCHANGED
-├── DataTableSkeleton.tsx                 # UNCHANGED
-├── DataTableEmpty.tsx                    # UNCHANGED
-├── DataTableSearch.tsx                   # UNCHANGED
-├── DataTableFacetedFilter.tsx            # UNCHANGED
-├── DataTableViewOptions.tsx              # UNCHANGED
-├── DataTableRowActions.tsx               # UNCHANGED
-├── DataTableToolbar.tsx                  # UNCHANGED (prop-based, still works)
-├── DataTableBulkBar.tsx                  # UNCHANGED
-├── DataTableViewToggle.tsx               # UNCHANGED
-└── DataTableCardGrid.tsx                 # UNCHANGED
+├── schemas/
+│   └── data-table.schema.ts    # Zod validation schemas
+│
+└── utils/
+    └── export-csv.ts           # CSV export utilities
 ```
 
 ---
@@ -766,28 +883,50 @@ export const DataTable = {
 };
 ```
 
-### Step 7: Modular Feature Hooks
+### Step 7: Modular Hook Extraction
 
-Refactor existing logic into `src/shared/lib/data-table/features/`:
-- Extract search state logic → `features/search/useSearch.ts`
-- Extract filter state logic → `features/filter/useFilter.ts`
-- Extract pagination logic → `features/pagination/usePagination.ts`
-- Extract sorting logic → `features/sorting/useSorting.ts`
-- Extract selection logic → `features/selection/useSelection.ts`
-- Extract export logic → `features/export/useExport.ts`
-- Extract bulk actions logic → `features/bulk-actions/useBulkActions.ts`
-- Extract view toggle logic → `features/view-toggle/useViewToggle.ts`
-- Extract column visibility → `features/column-visibility/useColumnVisibility.ts`
+Extract `useDataTable.ts` (259 lines) into 5 focused hooks in `src/shared/lib/data-table/modules/`:
 
-Note: The main `useDataTable` hook continues to orchestrate these. Feature hooks are extracted for clarity, testability, and independent reuse.
+1. `useViewState.ts` — view toggle state (from lines 43-51)
+2. `useDataSource.ts` — data source resolution + cursor map (from lines 54-84)
+3. `useTableState.ts` — pagination, sorting, filters, search with URL/local dual mode (from lines 88-129)
+4. `useServerData.ts` — query execution + loading/pagination flags (from lines 147-170)
+5. `useTableInstance.ts` — column visibility, row selection, useReactTable wiring (from lines 133-223)
 
-### Step 8: Wire into App
+Rewrite `useDataTable.ts` as a ~50-line thin orchestrator composing these hooks. `UseDataTableReturn` type remains unchanged — zero breaking changes for compound components.
+
+See [Modular Hook System](#modular-hook-system-modules) section for full details.
+
+### Step 8: Router Adapter Abstraction
+
+Make URL sync framework-agnostic by abstracting the TanStack Router dependency behind a pluggable adapter.
+
+Create `src/shared/lib/data-table/router/`:
+- `router-adapter.types.ts` — `RouterAdapter` interface: `{ useSearchParams(): { getParams, setParams } }`
+- `RouterAdapterProvider.tsx` — React context + `useRouterAdapter()` hook
+- `serialization.ts` — Extract `parseSortParam`, `serializeSortState`, `parseFiltersParam`, `serializeFiltersState` from `useDataTableSearchParams.ts`
+- `useUrlSyncedState.ts` — Same logic as `useDataTableSearchParams` but consumes any `RouterAdapter` instead of TanStack Router directly
+- `tanstack-router-adapter.ts` — TanStack Router adapter using `useSearch` + `useNavigate`
+
+Update `modules/useTableState.ts`:
+- Read adapter from `useRouterAdapter()` context
+- Replace `useDataTableSearchParams` with `useUrlSyncedState(adapter ?? noopAdapter)`
+- Dev warning when `syncWithUrl: true` but no adapter provided
+
+Rewrite `useDataTableSearchParams.ts`:
+- Delegate to `useUrlSyncedState` + TanStack adapter internally (backwards compat)
+
+Wire `RouterAdapterProvider` in `__root.tsx`.
+
+See [Router Adapter System](#router-adapter-system) section for full details.
+
+### Step 9: Wire into App
 
 - Add `DataProviderRegistry` to `src/app/routes/__root.tsx` alongside existing `DataTableProvider`
 - Create new demo page using compound composition pattern at `/demo-table-v2`
 - Keep existing `/demo-table` working unchanged
 
-### Step 9: Barrel Exports & Verification
+### Step 10: Barrel Exports & Verification
 
 - Update all `index.ts` barrel files
 - Run `npm run type-check`
@@ -833,6 +972,10 @@ Including `<DataTable.Search />` enables search. Removing it disables it. `{flag
 1. **Compound** — use `<DataTable.Root>` + children (90% of cases)
 2. **Mixed** — compound root + render prop on `<DataTable.Content>` (custom states)
 3. **Headless** — `useDataTable(config)` directly (fully custom UI)
+
+### 9. Router adapter, not router dependency
+
+URL sync is abstracted behind `RouterAdapter` — a ~15-line interface any framework can implement. The library has zero direct router imports. TanStack Router adapter is provided for this project; Next.js/React Router users write their own. Context-provided, same pattern as `DataProviderRegistry`.
 
 ---
 

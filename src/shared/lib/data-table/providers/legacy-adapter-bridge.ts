@@ -1,5 +1,5 @@
-import type { DataTableAdapter } from "../data-table.types";
-import type { DataProvider } from "../provider/data-provider.types";
+import type { DataProvider } from "../core/data-provider.types";
+import type { DataTableAdapter } from "../types/data-table.types";
 import { createRestProvider, type RestProviderOptions } from "./rest-provider";
 
 /**

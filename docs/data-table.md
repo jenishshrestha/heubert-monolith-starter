@@ -3,11 +3,36 @@
 A config-driven, modular data table system built on TanStack Table v8.
 Two ways to use it: **compound composition** (recommended) or **headless hook**.
 
+Everything lives in one place: `src/shared/lib/data-table/`.
+
+---
+
+## How It Works (The Big Picture)
+
+Think of the DataTable as a restaurant:
+
+- **You** (the developer) are the customer — you decide what to order
+- **The config** is your order — "I want a table with search, filters, and pagination"
+- **`DT.Root`** is the kitchen — it reads your order and prepares everything
+- **`DT.Toolbar`, `DT.Content`, `DT.Pagination`** are the dishes — you pick which ones to put on the table
+
+```
+Your Page
+  └── DT.Root (takes your config, sets everything up)
+        ├── DT.Toolbar (search bar + filter buttons)
+        ├── DT.Content (the actual table or card grid)
+        └── DT.Pagination (page numbers)
+```
+
+**The golden rule**: Include a component = enable the feature. Remove it = disable it. No boolean flags needed.
+
 ---
 
 ## Quick Start
 
-### 1. Define your data type
+### Step 1: Define your data type
+
+This tells TypeScript what shape your data looks like.
 
 ```typescript
 // features/users/user.types.ts
@@ -19,11 +44,13 @@ export interface User {
 }
 ```
 
-### 2. Define columns
+### Step 2: Define columns
+
+Columns tell the table what to display and how. Each column needs an `accessorKey` (which field to show) and a `header` (what the column title looks like).
 
 ```typescript
 // features/users/lib/columns.tsx
-import { DataTableColumnHeader } from "@shared/components/ui/DataTable";
+import { DataTableColumnHeader } from "@shared/lib/data-table";
 import type { DataTableColumnDef } from "@shared/lib/data-table";
 import type { User } from "../user.types";
 
@@ -49,7 +76,9 @@ export const userColumns: DataTableColumnDef<User>[] = [
 ];
 ```
 
-### 3. Create the config
+### Step 3: Create the config
+
+The config object is where you tell the DataTable everything it needs to know — what columns to show, where to fetch data from, and which features to enable.
 
 ```typescript
 // features/users/api/users-table.config.ts
@@ -60,20 +89,22 @@ import { userColumns } from "../lib/columns";
 export const usersTableConfig: DataTableConfig<User> = {
   columns: userColumns,
   dataSource: {
-    mode: "provider",
-    resource: "/users",
+    mode: "provider",    // uses the global DataProvider (set up in __root.tsx)
+    resource: "/users",  // the API endpoint
   },
   pagination: { defaultPageSize: 10 },
   enableSorting: true,
-  syncWithUrl: true,
+  syncWithUrl: true,     // table state saved in URL (back button works!)
 };
 ```
 
-### 4. Build the page (compound composition)
+### Step 4: Build the page
+
+This is where you compose the table UI. Think of it like building with LEGO blocks.
 
 ```tsx
 // features/users/UsersPage.tsx
-import { DT } from "@shared/components/ui/DataTable";
+import { DT } from "@shared/lib/data-table";
 import { usersTableConfig } from "./api/users-table.config";
 
 export function UsersPage() {
@@ -89,7 +120,7 @@ export function UsersPage() {
 }
 ```
 
-That's it. Search, pagination, sorting, loading states, and empty states all work out of the box.
+That's it. Search, pagination, sorting, loading skeletons, and empty states all work out of the box.
 
 ---
 
@@ -99,37 +130,20 @@ There are four ways to connect a table to data. Pick the one that fits your situ
 
 ### mode: "provider" (recommended)
 
-The table talks to your API through a **DataProvider** — a universal adapter that handles request building and response parsing. You configure the provider once, then every table just declares which resource to fetch.
+The table talks to your API through a **DataProvider** — a universal adapter that handles request building and response parsing. You configure the provider once in `__root.tsx`, then every table just declares which resource to fetch.
 
 ```typescript
 dataSource: {
   mode: "provider",
-  resource: "/users",            // the provider knows your base URL, auth, params
+  resource: "/users",  // the provider knows your base URL, auth, params
 }
 ```
 
-The global provider is set up in `__root.tsx`. If a specific table needs a different API, override with a per-table provider:
-
-```typescript
-import { createRestProvider } from "@shared/lib/data-table";
-
-const analyticsProvider = createRestProvider({
-  baseUrl: "https://analytics.internal/v2",
-  headers: () => ({ Authorization: `Bearer ${getAnalyticsToken()}` }),
-  pagination: { style: "page", pageParam: "p", pageSizeParam: "per_page" },
-  response: { dataPath: "results", totalPath: "meta.count" },
-});
-
-dataSource: {
-  mode: "provider",
-  resource: "/events",
-  provider: analyticsProvider,   // this table uses its own provider
-}
-```
+**When to use**: Most of the time. This is the default for production apps.
 
 ### mode: "api" (convenience shortcut)
 
-For simple REST APIs where you just want to declare the URL and param mapping inline. No provider setup needed. Good for prototyping or external APIs.
+For simple REST APIs where you declare the URL and param mapping inline. No provider setup needed.
 
 ```typescript
 dataSource: {
@@ -138,14 +152,15 @@ dataSource: {
   pagination: { style: "offset", skipParam: "skip", limitParam: "limit" },
   sort: { style: "flat", sortByParam: "sortBy", orderParam: "order" },
   searchParam: "q",
-  staticParams: { select: "id,name,email" },
   response: { dataPath: "users", totalPath: "total" },
 }
 ```
 
+**When to use**: Quick prototypes, external APIs, or when you don't want to set up a provider.
+
 ### mode: "server" (full control)
 
-You write the fetch function yourself. Use this for non-standard APIs, GraphQL with custom logic, or complex data transformations.
+You write the fetch function yourself.
 
 ```typescript
 dataSource: {
@@ -159,9 +174,11 @@ dataSource: {
 }
 ```
 
+**When to use**: Non-standard APIs, complex data transformations, or when other modes don't fit.
+
 ### mode: "client" (static data)
 
-For data that's already in memory. Sorting, filtering, and pagination happen client-side.
+For data that's already in memory. Sorting, filtering, and pagination happen client-side. Zero API calls after initial load.
 
 ```typescript
 dataSource: {
@@ -170,30 +187,64 @@ dataSource: {
 }
 ```
 
+**When to use**: Small datasets (<1000 rows), data loaded from a parent component, or offline-first apps.
+
 ---
 
-## Compound Composition (DT namespace)
+## Compound Composition (The DT Namespace)
 
-The `DT` namespace provides context-aware components. Wrap everything in `DT.Root` and compose features as children. **Include a component = enable the feature. Remove it = disable it.**
+The `DT` namespace gives you building blocks. Wrap everything in `DT.Root`, then compose features as children.
 
 ### Available components
 
-| Component | Purpose | Required props |
-|-----------|---------|----------------|
-| `DT.Root` | Wraps everything, provides context | `config` |
-| `DT.Content` | Renders table/cards with loading/empty states | None |
-| `DT.Toolbar` | Container for search, filters, with reset button | `children` |
-| `DT.Search` | Debounced search input | None (reads from context) |
-| `DT.Filter` | Faceted multi-select filter for a column | `column`, `title`, `options` |
-| `DT.Pagination` | Page numbers, page size selector | None |
-| `DT.BulkBar` | Floating bar when rows are selected | `children` |
-| `DT.ViewToggle` | Switch between table and card view | None |
-| `DT.ViewOptions` | Column visibility dropdown | None |
+| Component | What it does | Required props |
+|-----------|-------------|----------------|
+| `DT.Root` | Sets up the table, provides context to children | `config` |
+| `DT.Content` | Renders the table (or card grid, or skeleton, or empty state — automatically) | None |
+| `DT.Toolbar` | Container for search + filters. Can auto-render from config or accept children | None or `children` |
+| `DT.Search` | Debounced search input | None |
+| `DT.Filter` | Multi-select checkbox filter (like "Status: Active, Inactive") | `column`, `title`, `options` |
+| `DT.SingleFilter` | Single-select radio filter (like "Gender: Male") | `column`, `title`, `options` |
+| `DT.RangeFilter` | Min/max number range filter | `column`, `title` |
+| `DT.AdvancedFilter` | Sheet-based filter panel with all filter types | None |
+| `DT.FilterTags` | Shows active filters as removable chips | None |
+| `DT.Pagination` | Page numbers + rows-per-page selector | None |
+| `DT.BulkBar` | Floating bar when rows are selected (for bulk actions) | `children` |
+| `DT.ViewToggle` | Switch between table view and card view | None |
+| `DT.ViewOptions` | Column visibility dropdown ("Show/hide columns") | None |
+
+### Auto vs Manual Toolbar
+
+**Auto mode** — `DT.Toolbar` reads from `config.toolbar` and renders everything:
+
+```tsx
+// Config
+toolbar: {
+  search: { placeholder: "Search..." },
+  filters: [
+    { column: "status", type: "multi-select", options: statusOptions },
+  ],
+  columnToggle: true,
+},
+
+// JSX — just drop it in
+<DT.Toolbar />
+```
+
+**Manual mode** — pass children to control exactly what appears:
+
+```tsx
+<DT.Toolbar>
+  <DT.Search placeholder="Search..." />
+  <DT.Filter column="status" title="Status" options={statusOptions} />
+  <DT.ViewOptions />
+</DT.Toolbar>
+```
 
 ### Full example
 
 ```tsx
-import { DT, useDataTableContext } from "@shared/components/ui/DataTable";
+import { DT, useDataTableContext, exportCurrentPage } from "@shared/lib/data-table";
 import { Button } from "@shared/components/ui/Button";
 
 const statusOptions = [
@@ -224,12 +275,11 @@ export function UsersPage() {
       <DT.Toolbar>
         <DT.Search placeholder="Search users..." />
         <DT.Filter column="status" title="Status" options={statusOptions} />
-        <DT.Filter column="role" title="Role" options={roleOptions} />
       </DT.Toolbar>
 
+      <DT.FilterTags />
       <DT.Content />
-
-      <DT.Pagination showRowSelection />
+      <DT.Pagination />
 
       <DT.BulkBar>
         <Button>Export Selected</Button>
@@ -237,6 +287,20 @@ export function UsersPage() {
       </DT.BulkBar>
     </DT.Root>
   );
+}
+```
+
+### Using context in custom components
+
+Any component inside `DT.Root` can access table state. This is how you build custom features:
+
+```tsx
+import { useDataTableContext } from "@shared/lib/data-table";
+
+function SelectedCount() {
+  const { table } = useDataTableContext();
+  const count = table.getFilteredSelectedRowModel().rows.length;
+  return <span>{count} selected</span>;
 }
 ```
 
@@ -254,20 +318,6 @@ Override loading/empty/table rendering with a render prop:
 </DT.Content>
 ```
 
-### Using context in custom components
-
-Any component inside `DT.Root` can access table state:
-
-```tsx
-import { useDataTableContext } from "@shared/components/ui/DataTable";
-
-function SelectedCount() {
-  const { table } = useDataTableContext();
-  const count = table.getFilteredSelectedRowModel().rows.length;
-  return <span>{count} selected</span>;
-}
-```
-
 ---
 
 ## Headless Hook (useDataTable)
@@ -275,13 +325,7 @@ function SelectedCount() {
 For fully custom layouts where compound composition doesn't fit. You get the raw table instance and build everything yourself.
 
 ```tsx
-import { useDataTable } from "@shared/lib/data-table";
-import {
-  DataTable,
-  DataTablePagination,
-  DataTableToolbar,
-  DataTableFacetedFilter,
-} from "@shared/components/ui/DataTable";
+import { useDataTable, DataTable, DataTablePagination, DataTableToolbar } from "@shared/lib/data-table";
 
 export function CustomPage() {
   const {
@@ -291,9 +335,6 @@ export function CustomPage() {
     isEmpty,
     globalFilter,
     setGlobalFilter,
-    view,
-    setView,
-    availableViews,
   } = useDataTable(config);
 
   return (
@@ -302,13 +343,6 @@ export function CustomPage() {
         table={table}
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
-        filterSlot={
-          <DataTableFacetedFilter
-            column={table.getColumn("status")}
-            title="Status"
-            options={statusOptions}
-          />
-        }
       />
       {isLoading ? <Skeleton /> : <DataTable table={table} isFetching={isFetching} />}
       <DataTablePagination table={table} />
@@ -321,6 +355,15 @@ export function CustomPage() {
 
 ## DataProvider System
 
+### What's a DataProvider?
+
+A DataProvider is a translator between your table and your API. It knows how to:
+- Build the right URL with pagination, sorting, and filter params
+- Parse the response to extract data and total count
+- Handle auth headers
+
+You set it up once, and every table reuses it.
+
 ### Global provider setup
 
 Set up once in `__root.tsx`. Every `mode: "provider"` table uses this by default.
@@ -330,11 +373,17 @@ Set up once in `__root.tsx`. Every `mode: "provider"` table uses this by default
 import {
   applyMiddleware,
   createAxiosProvider,
+  createTanStackRouterAdapter,
   DataProviderRegistry,
   loggingMiddleware,
+  RouterAdapterProvider,
 } from "@shared/lib/data-table";
 import { apiClient } from "@shared/lib/api/client";
 
+// Router adapter (for URL sync)
+const routerAdapter = createTanStackRouterAdapter();
+
+// Data provider (for API calls)
 const dataProvider = applyMiddleware(
   import.meta.env.DEV ? [loggingMiddleware()] : [],
   createAxiosProvider(apiClient),
@@ -342,9 +391,11 @@ const dataProvider = applyMiddleware(
 
 function RootComponent() {
   return (
-    <DataProviderRegistry provider={dataProvider}>
-      <Outlet />
-    </DataProviderRegistry>
+    <RouterAdapterProvider adapter={routerAdapter}>
+      <DataProviderRegistry provider={dataProvider}>
+        <Outlet />
+      </DataProviderRegistry>
+    </RouterAdapterProvider>
   );
 }
 ```
@@ -363,45 +414,16 @@ const provider = createRestProvider({
   headers: () => ({ Authorization: `Bearer ${getToken()}` }),
   pagination: { style: "offset", skipParam: "skip", limitParam: "limit" },
   sort: { style: "flat", sortByParam: "sortBy", orderParam: "order" },
-  filter: { style: "flat", paramMap: { status: "filter_status" } },
   response: { dataPath: "data", totalPath: "total" },
-  searchParam: "q",
-  staticParams: { tenant: "acme" },
 });
 ```
 
-**Pagination styles:**
-
-| Style | Params sent | Example |
-|-------|-------------|---------|
-| `"offset"` | `skip` + `limit` | `?skip=20&limit=10` |
-| `"page"` | `page` + `pageSize` | `?page=2&pageSize=10` |
-
-**Sort styles:**
-
-| Style | Output | Example |
-|-------|--------|---------|
-| `"flat"` | Two params | `?sortBy=name&order=asc` |
-| `"json"` | JSON array | `?sort=[{"field":"name","direction":"asc"}]` |
-| `"repeated"` | Comma-separated | `?sort=name:asc,age:desc` |
-| `"custom"` | Your function | `serialize: (sort) => ({...})` |
-
-**Filter styles:**
-
-| Style | Output | Example |
-|-------|--------|---------|
-| `"flat"` | Key-value pairs | `?status=active` |
-| `"brackets"` | Rails-style | `?filter[status][eq]=active` |
-| `"json"` | JSON string | `?filters=[{"field":"status",...}]` |
-| `"custom"` | Your function | `serialize: (filters) => ({...})` |
-
 #### Axios Provider
 
-Wraps an Axios instance. Preserves all interceptors (auth, error handling, tenant headers).
+Wraps an Axios instance. Preserves all interceptors (auth, error handling).
 
 ```typescript
 import { createAxiosProvider } from "@shared/lib/data-table";
-import { apiClient } from "@shared/lib/api/client";
 
 const provider = createAxiosProvider(apiClient, {
   pagination: { style: "offset" },
@@ -418,29 +440,13 @@ import { createGraphQLProvider } from "@shared/lib/data-table";
 
 const provider = createGraphQLProvider({
   endpoint: "https://api.example.com/graphql",
-  headers: () => ({ Authorization: `Bearer ${getToken()}` }),
   resources: {
     "/products": {
-      query: `
-        query Products($first: Int, $after: String, $sortBy: ProductSortKey) {
-          products(first: $first, after: $after, sortKey: $sortBy) {
-            edges { node { id title price } }
-            pageInfo { hasNextPage endCursor }
-            totalCount
-          }
-        }
-      `,
-      variables: (params) => ({
-        first: params.pagination.type === "cursor" ? params.pagination.limit : 10,
-        after: params.pagination.type === "cursor" ? params.pagination.cursor : null,
-        sortBy: params.sort[0]?.field.toUpperCase() ?? "TITLE",
-      }),
+      query: `query Products($first: Int) { products(first: $first) { ... } }`,
+      variables: (params) => ({ first: params.pagination.limit }),
       transformResponse: (data) => ({
         data: data.products.edges.map((e) => e.node),
-        pagination: {
-          type: "cursor",
-          nextCursor: data.products.pageInfo.endCursor,
-        },
+        pagination: { type: "cursor", nextCursor: data.products.pageInfo.endCursor },
         total: data.products.totalCount,
       }),
     },
@@ -473,7 +479,7 @@ const customProvider: DataProvider = {
 
 ### Middleware
 
-Middlewares wrap a provider to add cross-cutting behavior. They compose left-to-right (first = outermost).
+Middlewares wrap a provider to add behavior. They compose left-to-right (first = outermost).
 
 ```typescript
 import {
@@ -493,38 +499,16 @@ const provider = applyMiddleware(
 );
 ```
 
-**Built-in middleware:**
-
 | Middleware | What it does |
 |-----------|-------------|
-| `loggingMiddleware()` | Logs `[DataProvider] /users getList: 142ms, 10 rows` to console |
+| `loggingMiddleware()` | Logs `[DataProvider] /users getList: 142ms, 10 rows` |
 | `errorNormalizerMiddleware()` | Wraps any error into a standard `DataProviderError` |
 | `retryMiddleware(opts)` | Retries on 5xx with exponential backoff |
 | `validationMiddleware(schema)` | Validates each row with a Zod schema |
 
-**Write your own:**
-
-```typescript
-import type { DataProviderMiddleware } from "@shared/lib/data-table";
-
-function authMiddleware(getToken: () => string): DataProviderMiddleware {
-  return (next) => ({
-    async getList(params) {
-      // Add auth to meta — provider can read it
-      return next.getList({
-        ...params,
-        meta: { ...params.meta, token: getToken() },
-      });
-    },
-  });
-}
-```
-
 ---
 
 ## Column Definitions
-
-Columns use TanStack Table's `ColumnDef` extended with a `meta` field for DataTable-specific features.
 
 ### Basic column
 
@@ -549,7 +533,7 @@ Columns use TanStack Table's `ColumnDef` extended with a `meta` field for DataTa
 }
 ```
 
-### Computed column (no direct accessor)
+### Computed column
 
 ```typescript
 {
@@ -559,39 +543,15 @@ Columns use TanStack Table's `ColumnDef` extended with a `meta` field for DataTa
 }
 ```
 
-### Column with avatar + subtext
-
-```typescript
-{
-  id: "name",
-  accessorFn: (row) => `${row.firstName} ${row.lastName}`,
-  header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
-  cell: ({ row }) => (
-    <div className="flex items-center gap-2">
-      <Avatar className="size-7">
-        <AvatarImage src={row.original.image} />
-        <AvatarFallback>{row.original.firstName[0]}</AvatarFallback>
-      </Avatar>
-      <div className="flex flex-col">
-        <span className="font-medium">{row.original.firstName} {row.original.lastName}</span>
-        <span className="text-muted-foreground text-xs">{row.original.email}</span>
-      </div>
-    </div>
-  ),
-  enableSorting: false,
-}
-```
-
 ### Column meta options
 
 ```typescript
 {
   accessorKey: "notes",
   meta: {
-    label: "Notes",                    // used in column visibility dropdown
-    hiddenByDefault: true,             // hidden until user enables it
-    exportable: true,                  // included in CSV export
-    className: "max-w-[200px] truncate", // cell CSS class
+    label: "Notes",            // shown in column visibility dropdown
+    hiddenByDefault: true,     // hidden until user enables it
+    exportable: true,          // included in CSV export
   },
 }
 ```
@@ -599,7 +559,7 @@ Columns use TanStack Table's `ColumnDef` extended with a `meta` field for DataTa
 ### Row actions column
 
 ```typescript
-import { DataTableRowActions } from "@shared/components/ui/DataTable";
+import { DataTableRowActions } from "@shared/lib/data-table";
 
 const actions = [
   { label: "View", icon: EyeIcon, onClick: (row) => navigate(`/users/${row.id}`) },
@@ -629,282 +589,155 @@ Requires `enableRowSelection: true` in the config.
 
 ---
 
-## Config Reference
+## Router Adapter (URL Sync)
+
+The DataTable can sync its state (page, sort, filters, search) to the URL. This is powered by a **RouterAdapter** — a small interface that reads/writes URL params.
+
+### How it works
+
+```
+User sorts by "Name" → table updates URL → ?sort=name.asc
+User hits Back button → URL changes → table reads new state
+```
+
+### Built-in adapter (TanStack Router)
+
+This project uses TanStack Router. The adapter is already set up in `__root.tsx`:
+
+```tsx
+import { createTanStackRouterAdapter, RouterAdapterProvider } from "@shared/lib/data-table";
+
+const routerAdapter = createTanStackRouterAdapter();
+
+<RouterAdapterProvider adapter={routerAdapter}>
+  <App />
+</RouterAdapterProvider>
+```
+
+### Next.js / other frameworks
+
+Write a ~15-line adapter:
 
 ```typescript
-interface DataTableConfig<TData> {
-  // Required
-  columns?: DataTableColumnDef<TData>[];
-  dataSource: DataSource<TData>;
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import type { RouterAdapter } from "@shared/lib/data-table";
 
-  // Pagination
-  pagination?: {
-    enabled?: boolean;               // default: true
-    pageSizeOptions?: number[];      // default: [10, 20, 30, 50]
-    defaultPageSize?: number;        // default: 10
-  };
-
-  // Search
-  search?: {
-    enabled?: boolean;
-    placeholder?: string;
-    debounceMs?: number;             // default: 300
-  };
-
-  // Features
-  enableSorting?: boolean;           // default: true
-  enableColumnVisibility?: boolean;
-  enableRowSelection?: boolean | ((row: TData) => boolean);
-  enableMultiSort?: boolean;
-
-  // Views
-  defaultView?: "table" | "card";
-  cardRenderer?: (row: TData, opts: { isSelected; onSelect }) => ReactNode;
-
-  // URL sync
-  syncWithUrl?: boolean;             // default: true
-  urlParamPrefix?: string;           // prefix for URL params (for multiple tables)
-
-  // Actions
-  rowActions?: DataTableRowAction<TData>[];
-  bulkActions?: DataTableBulkAction<TData>[];
-
-  // Export
-  enableExport?: boolean;
-  exportFilename?: string;
-
-  // Display
-  emptyState?: ReactNode;
-}
-```
-
----
-
-## Features as Modules
-
-Every feature can be independently enabled or disabled by including or removing its component. Here's how each one works.
-
-### Search
-
-```tsx
-// Enabled — just include the component
-<DT.Toolbar>
-  <DT.Search placeholder="Search..." />
-</DT.Toolbar>
-
-// Disabled — remove the component
-<DT.Toolbar>
-  {/* no DT.Search = no search */}
-</DT.Toolbar>
-```
-
-### Faceted Filters
-
-```tsx
-const statusOptions = [
-  { label: "Active", value: "active" },
-  { label: "Inactive", value: "inactive" },
-];
-
-<DT.Toolbar>
-  <DT.Filter column="status" title="Status" options={statusOptions} />
-  <DT.Filter column="role" title="Role" options={roleOptions} />
-</DT.Toolbar>
-```
-
-### Row Selection + Bulk Actions
-
-```typescript
-// 1. Enable in config
-enableRowSelection: true,
-
-// 2. Add selection column
-columns: [createSelectionColumn<User>(), ...userColumns],
-```
-
-```tsx
-// 3. Add bulk bar
-<DT.BulkBar>
-  <Button onClick={handleExport}>Export Selected</Button>
-  <Button variant="destructive" onClick={handleDelete}>Delete</Button>
-</DT.BulkBar>
-```
-
-### Table/Card View Toggle
-
-```typescript
-// 1. Provide a card renderer in config
-cardRenderer: (user, { isSelected, onSelect }) => (
-  <UserCard key={user.id} user={user} isSelected={isSelected} onSelect={onSelect} />
-),
-```
-
-```tsx
-// 2. Add toggle button
-<DT.ViewToggle />
-
-// DT.Content automatically switches between table and card grid
-<DT.Content />
-```
-
-### Column Visibility
-
-```tsx
-<DT.ViewOptions />
-```
-
-Columns with `meta.hiddenByDefault: true` start hidden. Users toggle them in the dropdown.
-
-### CSV Export
-
-```tsx
-import { exportCurrentPage, exportSelectedRows } from "@shared/lib/data-table";
-
-function ExportButton() {
-  const { table } = useDataTableContext();
-  return (
-    <Button onClick={() => exportCurrentPage(table, { filename: "users" })}>
-      Export CSV
-    </Button>
-  );
-}
-```
-
-### Runtime Feature Flags
-
-Since features are React components, conditional rendering is your feature flag:
-
-```tsx
-<DT.Toolbar>
-  <DT.Search />
-  {featureFlags.advancedFilters && <DT.Filter column="status" ... />}
-  {featureFlags.export && <ExportButton />}
-</DT.Toolbar>
-```
-
----
-
-## Replacing a Feature
-
-Any compound component can be replaced with your own. Use `useDataTableContext()` to access table state.
-
-### Example: Replace pagination with infinite scroll
-
-```tsx
-import { useDataTableContext } from "@shared/components/ui/DataTable";
-
-function InfiniteScrollLoader() {
-  const { table, isFetching, hasNextPage } = useDataTableContext();
-
-  const loadMore = () => {
-    if (hasNextPage && !isFetching) {
-      table.nextPage();
-    }
-  };
-
-  return (
-    <div ref={infiniteScrollRef} onIntersect={loadMore}>
-      {isFetching && <Spinner />}
-    </div>
-  );
-}
-
-// Use it:
-<DT.Root config={config}>
-  <DT.Content />
-  <InfiniteScrollLoader />  {/* replaces <DT.Pagination /> */}
-</DT.Root>
-```
-
-### Example: Replace search with command palette
-
-```tsx
-function CommandPaletteSearch() {
-  const { setGlobalFilter } = useDataTableContext();
-  return <CommandPalette onSearch={setGlobalFilter} />;
-}
-
-<DT.Toolbar>
-  <CommandPaletteSearch />  {/* replaces <DT.Search /> */}
-</DT.Toolbar>
-```
-
----
-
-## Cursor Pagination
-
-For APIs that use cursor-based pagination (Slack-style, GraphQL relay):
-
-```typescript
-dataSource: {
-  mode: "provider",
-  resource: "/messages",
-  provider: myProvider,
-  paginationType: "cursor",
-},
-```
-
-The pagination UI automatically switches to prev/next buttons (no page numbers).
-
-The provider must return:
-
-```typescript
-{
-  data: [...],
-  pagination: {
-    type: "cursor",
-    nextCursor: "abc123",        // null if no more pages
-    previousCursor: "xyz789",    // optional
+export const nextJsRouterAdapter: RouterAdapter = {
+  useSearchParams() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+    return {
+      getParams: () => Object.fromEntries(searchParams.entries()),
+      setParams: (updates) => {
+        const params = new URLSearchParams(searchParams.toString());
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === undefined) params.delete(key);
+          else params.set(key, String(value));
+        }
+        router.replace(`${pathname}?${params.toString()}`);
+      },
+    };
   },
-  total: 1200,                   // optional for cursor
-}
+};
 ```
 
----
+### Disabling URL sync
 
-## URL State Sync
+```typescript
+syncWithUrl: false,  // table state stays in React state only
+```
 
-When `syncWithUrl: true` (default), table state is stored in the URL:
-
-| State | URL param | Example |
-|-------|-----------|---------|
-| Page | `page` | `?page=2` |
-| Page size | `pageSize` | `?pageSize=20` |
-| Sort | `sort` | `?sort=name.asc` |
-| Filters | `filters` | `?filters=[{"id":"status","value":"active"}]` |
-| Search | `search` | `?search=john` |
-
-Default values are omitted to keep URLs clean.
-
-For multiple tables on one page, use `urlParamPrefix`:
+### Multiple tables on one page
 
 ```typescript
 // Table 1
-syncWithUrl: true,
-urlParamPrefix: "users",    // ?users_page=2&users_sort=name.asc
+syncWithUrl: true, urlParamPrefix: "users",    // ?users_page=2&users_sort=name.asc
 
 // Table 2
-syncWithUrl: true,
-urlParamPrefix: "orders",   // ?orders_page=1&orders_sort=date.desc
+syncWithUrl: true, urlParamPrefix: "orders",   // ?orders_page=1
 ```
 
 ---
 
-## File Organization
+## Library File Structure
 
-Follow the feature-driven structure:
+Everything lives in `src/shared/lib/data-table/`:
 
 ```
-features/users/
-├── UsersPage.tsx                 # page component (uses DT.Root)
-├── api/
-│   └── users-table.config.ts    # DataTableConfig
-├── lib/
-│   └── columns.tsx              # column definitions
-├── components/
-│   └── UserCard.tsx             # card renderer (optional)
-├── user.types.ts                # data type
-└── index.ts                     # public API
+src/shared/lib/data-table/
+  index.ts              ← single import point for consumers
+
+  components/           ← UI components (table, filters, pagination, etc.)
+    DataTable.tsx           table renderer
+    DataTableSearch.tsx     debounced search input
+    DataTablePagination.tsx page numbers + page size
+    DataTableColumnHeader.tsx  sortable column header
+    DataTableFacetedFilter.tsx multi-select filter
+    DataTableSingleFilter.tsx  single-select filter
+    DataTableRangeFilter.tsx   min/max range filter
+    DataTableAdvancedFilter.tsx  sheet-based filter panel
+    DataTableFilterTags.tsx    active filter chips
+    DataTableViewToggle.tsx    table/card view switch
+    DataTableViewOptions.tsx   column visibility
+    DataTableBulkBar.tsx       floating bulk action bar
+    DataTableRowActions.tsx    per-row action dropdown
+    DataTableCardGrid.tsx      card grid layout
+    DataTableEmpty.tsx         empty state
+    DataTableSkeleton.tsx      loading skeleton
+    DataTableToolbar.tsx       toolbar (auto + manual modes)
+    DataTableContext.tsx        4 React contexts for perf
+    DataTableRoot.tsx           root provider component
+    DataTableContent.tsx        smart content renderer
+
+  modules/              ← hook decomposition (useDataTable internals)
+    useDataTable.ts         main hook (thin orchestrator)
+    useDataTableQuery.ts    React Query wrapper
+    useViewState.ts         view toggle state
+    useDataSource.ts        data source resolution
+    useTableState.ts        pagination/sort/filter/search state
+    useServerData.ts        server query + loading flags
+    useTableInstance.ts     TanStack Table wiring
+
+  core/                 ← provider framework
+    DataProviderRegistry.tsx  global provider context
+    DataTableProvider.tsx     legacy adapter context
+    data-provider.types.ts    DataProvider interface
+    data-provider-error.ts    error normalization
+    data-provider-middleware.ts  middleware composition
+    resolveDataSource.ts      mode:"api" resolver
+    resolveProviderDataSource.ts  mode:"provider" resolver
+
+  providers/            ← built-in provider implementations
+    rest-provider.ts        fetch-based REST
+    axios-provider.ts       Axios wrapper
+    graphql-provider.ts     GraphQL
+    legacy-adapter-bridge.ts  backwards compat bridge
+
+  middleware/            ← built-in middleware
+    logging.ts, retry.ts, error-normalizer.ts, validation.ts
+
+  router/               ← framework-agnostic URL sync
+    RouterAdapterProvider.tsx  context for router adapter
+    tanstack-router-adapter.ts  TanStack Router implementation
+    useUrlSyncedState.ts       generic URL-synced state
+    serialization.ts           sort/filter URL encoding
+
+  types/                ← type definitions
+    data-table.types.ts
+
+  schemas/              ← validation schemas
+    data-table.schema.ts
+
+  utils/                ← standalone utilities
+    export-csv.ts
+```
+
+**Consumer import**: everything comes from one path:
+
+```typescript
+import { DT, useDataTable, DataTableColumnHeader } from "@shared/lib/data-table";
+import type { DataTableConfig, DataTableColumnDef } from "@shared/lib/data-table";
 ```
 
 ---
@@ -924,5 +757,6 @@ features/users/
 
 | Route | What it demonstrates |
 |-------|---------------------|
-| `/demo-table` | Headless hook approach with `mode: "api"` (original) |
-| `/demo-table-v2` | Compound composition with `mode: "provider"` + per-table REST provider |
+| `/demo-showcase` | All 5 data source modes: custom provider, REST provider, API mode, client mode |
+| `/demo-table` | Headless hook approach with `mode: "api"` |
+| `/demo-table-v2` | Compound composition with `mode: "provider"` |

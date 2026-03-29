@@ -1,4 +1,4 @@
-import type { DataProviderMiddleware } from "../provider/data-provider-middleware";
+import type { DataProviderMiddleware } from "../core/data-provider-middleware";
 
 export interface RetryOptions {
   /** Maximum number of retries (default: 2). */

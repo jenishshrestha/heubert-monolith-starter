@@ -8,15 +8,13 @@ import { Button } from "@shared/components/ui/Button";
 import { Card, CardContent, CardHeader } from "@shared/components/ui/Card";
 import { Checkbox } from "@shared/components/ui/Checkbox";
 import {
+  createRestProvider,
+  createSelectionColumn,
   DataTableColumnHeader,
   DataTableRowActions,
   DT,
-  useDataTableContext,
-} from "@shared/components/ui/DataTable";
-import {
-  createRestProvider,
-  createSelectionColumn,
   exportSelectedRows,
+  useDataTableContext,
 } from "@shared/lib/data-table";
 import type { DataTableColumnDef, DataTableConfig } from "@shared/lib/data-table/data-table.types";
 import { CopyIcon, DownloadIcon, EyeIcon, PencilIcon, TrashIcon } from "lucide-react";
@@ -71,7 +69,7 @@ const columns: DataTableColumnDef<User>[] = [
         </div>
       </div>
     ),
-    meta: { label: "Name" },
+    meta: { label: "Name", filter: { type: "text" as const } },
     enableSorting: false,
   },
   {
@@ -91,7 +89,16 @@ const columns: DataTableColumnDef<User>[] = [
         {row.getValue<string>("gender")}
       </Badge>
     ),
-    meta: { label: "Gender" },
+    meta: {
+      label: "Gender",
+      filter: {
+        type: "select" as const,
+        options: [
+          { label: "Male", value: "male" },
+          { label: "Female", value: "female" },
+        ],
+      },
+    },
   },
   {
     accessorKey: "phone",
@@ -103,7 +110,7 @@ const columns: DataTableColumnDef<User>[] = [
     accessorKey: "university",
     header: ({ column }) => <DataTableColumnHeader column={column} title="University" />,
     cell: ({ row }) => <span className="max-w-[200px] truncate">{row.getValue("university")}</span>,
-    meta: { label: "University", hiddenByDefault: true },
+    meta: { label: "University", hiddenByDefault: true, filter: { type: "text" as const } },
   },
   {
     id: "actions",
@@ -182,6 +189,11 @@ const config: DataTableConfig<User> = {
     provider: dummyJsonProvider,
     paginationType: "offset",
   },
+  toolbar: {
+    search: { placeholder: "Search users..." },
+    advancedFilter: true,
+    columnToggle: true,
+  },
   pagination: { defaultPageSize: 10, pageSizeOptions: [5, 10, 20] },
   enableSorting: true,
   enableRowSelection: true,
@@ -220,13 +232,8 @@ export function UsersTable() {
         </p>
         <DT.ViewToggle />
       </div>
-      <DT.Toolbar>
-        <DT.Search placeholder="Search users..." />
-        {/* Gender filter removed — DummyJSON doesn't support server-side filtering.
-            The filter would only affect the current page, which is misleading.
-            See ProductsTable for real server-side filtering via Platzi API. */}
-        <DT.ViewOptions />
-      </DT.Toolbar>
+      <DT.Toolbar />
+      <DT.FilterTags />
       <DT.Content />
       <DT.Pagination />
       <DT.BulkBar>
