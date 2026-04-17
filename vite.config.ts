@@ -15,7 +15,7 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
-    strictPort: true,
+    strictPort: false,
   },
   resolve: {
     alias: {
@@ -23,6 +23,33 @@ export default defineConfig({
       "@shared": path.resolve(__dirname, "./src/shared"),
       "@features": path.resolve(__dirname, "./src/features"),
       "@app": path.resolve(__dirname, "./src/app"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+          if (id.includes("react-dom") || /\/react\//.test(id)) {
+            return "react";
+          }
+          if (id.includes("@tanstack")) {
+            return "tanstack";
+          }
+          if (id.includes("radix-ui") || id.includes("@radix-ui")) {
+            return "radix";
+          }
+          if (id.includes("react-hook-form") || id.includes("@hookform") || id.includes("/zod/")) {
+            return "forms";
+          }
+          if (id.includes("/motion/") || id.includes("next-themes")) {
+            return "motion";
+          }
+          return "vendor";
+        },
+      },
     },
   },
 });

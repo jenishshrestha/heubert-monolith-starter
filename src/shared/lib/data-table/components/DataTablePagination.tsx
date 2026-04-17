@@ -7,12 +7,7 @@ import {
   SelectValue,
 } from "@shared/components/ui/Select";
 import type { Table } from "@tanstack/react-table";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronsLeftIcon,
-  ChevronsRightIcon,
-} from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useDataTableInstance, useDataTableReactive } from "./DataTableContext";
 
 interface DataTablePaginationProps<TData> {
@@ -61,45 +56,15 @@ function DataTablePagination<TData>({
   const to = Math.min(from + table.getRowModel().rows.length - 1, totalRows);
 
   return (
-    <div className="flex flex-col gap-3 px-2 py-4 sm:flex-row sm:items-center sm:justify-between">
-      {/* Left: record count + rows per page */}
-      <div className="flex items-center gap-4">
-        <span className="text-muted-foreground text-sm tabular-nums">
-          {totalRows > 0 ? `Showing ${from}–${to} of ${totalRows}` : "No records"}
-        </span>
+    <div className="flex flex-wrap items-center justify-end gap-3 px-2 py-4">
+      <span className="text-sm tabular-nums text-foreground">
+        {totalRows > 0 ? `${from}-${to} of ${totalRows} items` : "No records"}
+      </span>
 
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-sm">Rows per page</span>
-          <Select value={`${pageSize}`} onValueChange={(value) => table.setPageSize(Number(value))}>
-            <SelectTrigger size="sm" className="h-8 w-18">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent side="top">
-              {pageSizeOptions.map((size) => (
-                <SelectItem key={size} value={`${size}`}>
-                  {size}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Right: page navigation */}
       {totalPages > 1 && (
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            size="icon-sm"
-            onClick={() => table.setPageIndex(0)}
-            disabled={!table.getCanPreviousPage()}
-          >
-            <ChevronsLeftIcon className="size-4" />
-            <span className="sr-only">Go to first page</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
@@ -107,21 +72,17 @@ function DataTablePagination<TData>({
             Previous
           </Button>
 
-          {pageNumbers.map((page, _i, arr) =>
+          {pageNumbers.map((page, i) =>
             page === "ellipsis" ? (
-              <span
-                key={arr.indexOf("ellipsis") === _i ? "ellipsis-start" : "ellipsis-end"}
-                className="text-muted-foreground px-1 text-sm"
-              >
+              <span key={`ellipsis-${String(i)}`} className="text-muted-foreground px-2 text-sm">
                 ...
               </span>
             ) : (
               <Button
                 key={page}
-                variant={page === currentPage ? "default" : "ghost"}
-                size="icon-sm"
+                variant={page === currentPage ? "outline" : "ghost"}
+                size="icon"
                 onClick={() => table.setPageIndex(page)}
-                className="min-w-8"
               >
                 {page + 1}
               </Button>
@@ -130,24 +91,27 @@ function DataTablePagination<TData>({
 
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
           >
             Next
             <ChevronRightIcon className="size-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => table.setPageIndex(totalPages - 1)}
-            disabled={!table.getCanNextPage()}
-          >
-            <ChevronsRightIcon className="size-4" />
-            <span className="sr-only">Go to last page</span>
-          </Button>
         </div>
       )}
+
+      <Select value={`${pageSize}`} onValueChange={(value) => table.setPageSize(Number(value))}>
+        <SelectTrigger className="w-auto">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent side="top">
+          {pageSizeOptions.map((size) => (
+            <SelectItem key={size} value={`${size}`}>
+              {size} / page
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

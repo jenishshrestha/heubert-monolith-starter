@@ -1,6 +1,10 @@
 import type { Table } from "@tanstack/react-table";
 import { createContext, useContext } from "react";
-import type { DataTableConfig, DataTableView } from "../types/data-table.types";
+import type {
+  AdvancedFiltersState,
+  DataTableConfig,
+  DataTableView,
+} from "../types/data-table.types";
 
 // ---- Focused context slices ----
 // Split into 4 contexts so components only re-render when their specific data changes.
@@ -46,8 +50,9 @@ const StableCtx = createContext<DataTableStableValue | null>(null);
 const SearchCtx = createContext<DataTableSearchValue | null>(null);
 const ViewCtx = createContext<DataTableViewValue | null>(null);
 const ReactiveCtx = createContext<DataTableReactiveValue | null>(null);
+const AdvancedFilterCtx = createContext<AdvancedFiltersState | null>(null);
 
-export { ReactiveCtx, SearchCtx, StableCtx, ViewCtx };
+export { AdvancedFilterCtx, ReactiveCtx, SearchCtx, StableCtx, ViewCtx };
 
 // ---- Focused hooks (subscribe to ONE context) ----
 
@@ -91,6 +96,11 @@ export function useDataTableReactive<TData = unknown>(): DataTableReactiveValue<
     useContext(ReactiveCtx),
     "useDataTableReactive",
   ) as DataTableReactiveValue<TData>;
+}
+
+/** Advanced filter state (opt-in; null if not configured). */
+export function useDataTableAdvancedFilters(): AdvancedFiltersState {
+  return assertContext(useContext(AdvancedFilterCtx), "useDataTableAdvancedFilters");
 }
 
 // ---- Combined hook (backward compat + custom components) ----

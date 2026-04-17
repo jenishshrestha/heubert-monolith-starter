@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useDataTable } from "../modules/useDataTable";
 import type { DataTableConfig } from "../types/data-table.types";
-import { ReactiveCtx, SearchCtx, StableCtx, ViewCtx } from "./DataTableContext";
+import { AdvancedFilterCtx, ReactiveCtx, SearchCtx, StableCtx, ViewCtx } from "./DataTableContext";
 
 interface DataTableRootProps<TData> {
   config: DataTableConfig<TData>;
@@ -63,7 +63,9 @@ function DataTableRoot<TData>({ config, children, className }: DataTableRootProp
       <SearchCtx.Provider value={searchValue}>
         <ViewCtx.Provider value={viewValue}>
           <ReactiveCtx.Provider value={reactiveValue}>
-            <div className={className}>{children}</div>
+            <AdvancedFilterCtx.Provider value={result.advanced}>
+              <div className={className}>{children}</div>
+            </AdvancedFilterCtx.Provider>
           </ReactiveCtx.Provider>
         </ViewCtx.Provider>
       </SearchCtx.Provider>

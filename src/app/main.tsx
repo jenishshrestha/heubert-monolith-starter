@@ -3,7 +3,6 @@ import type { ErrorInfo, ReactNode } from "react";
 import { Component, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "../global.css";
-import { useThemeStore } from "@shared/stores/theme-store";
 
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
@@ -61,9 +60,6 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
     return this.props.children;
   }
 }
-
-// Initialize theme on app boot
-useThemeStore.getState().initTheme();
 
 // Render the app
 const rootElement = document.getElementById("root");

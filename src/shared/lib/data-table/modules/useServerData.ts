@@ -1,4 +1,5 @@
 import type { ColumnFiltersState, PaginationState, SortingState } from "@tanstack/react-table";
+import type { AdvancedFilterState } from "./useAdvancedFilters";
 import type { ResolvedDataSource } from "./useDataSource";
 import { noopQueryFn } from "./useDataSource";
 import { useDataTableQuery } from "./useDataTableQuery";
@@ -9,6 +10,7 @@ interface UseServerDataOptions<TData> {
   sorting: SortingState;
   columnFilters: ColumnFiltersState;
   globalFilter: string;
+  advancedFilters?: AdvancedFilterState;
 }
 
 export interface UseServerDataReturn<TData> {
@@ -24,7 +26,7 @@ export interface UseServerDataReturn<TData> {
 export function useServerData<TData>(
   options: UseServerDataOptions<TData>,
 ): UseServerDataReturn<TData> {
-  const { dataSource, pagination, sorting, columnFilters, globalFilter } = options;
+  const { dataSource, pagination, sorting, columnFilters, globalFilter, advancedFilters } = options;
   const isServer = dataSource.mode === "server";
 
   const serverQuery = useDataTableQuery({
@@ -35,6 +37,7 @@ export function useServerData<TData>(
     sorting,
     columnFilters,
     globalFilter,
+    advancedFilters,
   });
 
   const data: TData[] = isServer ? serverQuery.data : dataSource.data;

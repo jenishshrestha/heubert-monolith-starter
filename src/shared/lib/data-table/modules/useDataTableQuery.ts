@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ColumnFiltersState, PaginationState, SortingState } from "@tanstack/react-table";
 import { useMemo } from "react";
 import type { DataTableQueryParams, DataTableServerResponse } from "../types/data-table.types";
+import type { AdvancedFilterState } from "./useAdvancedFilters";
 
 interface UseDataTableQueryOptions<TData> {
   enabled: boolean;
@@ -11,10 +12,12 @@ interface UseDataTableQueryOptions<TData> {
   sorting: SortingState;
   columnFilters: ColumnFiltersState;
   globalFilter: string;
+  advancedFilters?: AdvancedFilterState;
 }
 
 export function useDataTableQuery<TData>(options: UseDataTableQueryOptions<TData>) {
-  const { queryKey, queryFn, pagination, sorting, columnFilters, globalFilter } = options;
+  const { queryKey, queryFn, pagination, sorting, columnFilters, globalFilter, advancedFilters } =
+    options;
 
   // Memoize params so React Query sees a stable queryKey.
   // Without this, .map() creates new arrays every render → cache misses.
@@ -25,8 +28,17 @@ export function useDataTableQuery<TData>(options: UseDataTableQueryOptions<TData
       sorting: sorting.map((s) => ({ id: s.id, desc: s.desc })),
       filters: columnFilters.map((f) => ({ id: f.id, value: f.value })),
       search: globalFilter || undefined,
+      advancedFilters:
+        advancedFilters && Object.keys(advancedFilters).length > 0 ? advancedFilters : undefined,
     }),
-    [pagination.pageIndex, pagination.pageSize, sorting, columnFilters, globalFilter],
+    [
+      pagination.pageIndex,
+      pagination.pageSize,
+      sorting,
+      columnFilters,
+      globalFilter,
+      advancedFilters,
+    ],
   );
 
   const query = useQuery({

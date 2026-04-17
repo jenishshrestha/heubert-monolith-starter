@@ -1,4 +1,3 @@
-import { AppHeader } from "@shared/components/layouts/AppHeader";
 import { ThemeProvider } from "@shared/components/providers";
 import { apiClient } from "@shared/lib/api/client";
 import {
@@ -92,7 +91,6 @@ function RootComponent() {
           <DataTableProvider adapter={dataTableAdapter}>
             <DataProviderRegistry provider={dataProvider}>
               <div className="min-h-screen bg-background font-sans antialiased">
-                <AppHeader />
                 <Outlet />
               </div>
             </DataProviderRegistry>

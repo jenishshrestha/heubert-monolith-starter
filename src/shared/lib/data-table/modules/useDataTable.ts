@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { DataTableConfig, UseDataTableReturn } from "../types/data-table.types";
+import { useAdvancedFilters } from "./useAdvancedFilters";
 import { useDataSource } from "./useDataSource";
 import { useServerData } from "./useServerData";
 import { useTableInstance } from "./useTableInstance";
@@ -37,16 +38,23 @@ export function useDataTable<TData>(config: DataTableConfig<TData>): UseDataTabl
     urlParamPrefix: config.urlParamPrefix,
   });
 
-  // 4. Server-side data fetching (noop for client mode)
+  // 4. Advanced filters (opt-in via config.advancedFilters)
+  const advanced = useAdvancedFilters(config.advancedFilters, {
+    syncWithUrl: config.advancedFilters?.syncWithUrl ?? syncWithUrl,
+    urlParamPrefix: config.urlParamPrefix ? `${config.urlParamPrefix}af.` : "af.",
+  });
+
+  // 5. Server-side data fetching (noop for client mode)
   const serverData = useServerData({
     dataSource,
     pagination: state.pagination,
     sorting: state.sorting,
     columnFilters: state.columnFilters,
     globalFilter: state.globalFilter,
+    advancedFilters: advanced.enabled ? advanced.filters : undefined,
   });
 
-  // 5. TanStack Table instance
+  // 6. TanStack Table instance
   const { table } = useTableInstance({
     columns,
     data: serverData.data,
@@ -76,6 +84,7 @@ export function useDataTable<TData>(config: DataTableConfig<TData>): UseDataTabl
       availableViews,
       hasNextPage: serverData.hasNextPage,
       hasPreviousPage: serverData.hasPreviousPage,
+      advanced,
     }),
     [
       table,
@@ -91,6 +100,7 @@ export function useDataTable<TData>(config: DataTableConfig<TData>): UseDataTabl
       availableViews,
       serverData.hasNextPage,
       serverData.hasPreviousPage,
+      advanced,
     ],
   );
 }
