@@ -43,3 +43,6 @@ playwright-report/
 .agents/
 .claude/
 .tanstack/tmp/
+
+# Reviews
+reviews/

@@ -8,14 +8,11 @@ import {
   useDataTableView,
 } from "./DataTableContext";
 import { DataTableEmpty } from "./DataTableEmpty";
-import { DataTableSkeleton } from "./DataTableSkeleton";
 
 interface DataTableContentProps<TData = unknown> {
   /** Override the default rendering with a render prop. */
   children?: (ctx: DataTableContextValue<TData>) => React.ReactNode;
-  /** Number of skeleton columns (defaults to column count + 1). */
-  skeletonColumns?: number;
-  /** Number of skeleton rows (defaults to 10). */
+  /** Override skeleton row count. Defaults to current pageSize. */
   skeletonRows?: number;
   /** Custom empty state title. */
   emptyTitle?: string;
@@ -26,30 +23,24 @@ interface DataTableContentProps<TData = unknown> {
 
 function DataTableContent<TData>({
   children,
-  skeletonColumns,
-  skeletonRows = 10,
+  skeletonRows,
   emptyTitle = "No results found",
   emptyDescription = "Try adjusting your filters.",
   className,
 }: DataTableContentProps<TData>) {
-  // All hooks must be called unconditionally
   const ctx = useDataTableContext<TData>();
   const { config } = useDataTableInstance<TData>();
   const { table, isLoading, isFetching, isEmpty } = useDataTableReactive<TData>();
   const { view } = useDataTableView();
 
-  // Render prop escape hatch
   if (children) {
     return <>{children(ctx)}</>;
   }
 
-  const columnCount = skeletonColumns ?? (config.columns?.length ?? 3) + 1;
+  const loading = isLoading || isFetching;
+  const effectiveSkeletonRows = skeletonRows ?? table.getState().pagination.pageSize;
 
-  if (isLoading) {
-    return <DataTableSkeleton columnCount={columnCount} rowCount={skeletonRows} />;
-  }
-
-  if (isEmpty) {
+  if (!loading && isEmpty) {
     return <DataTableEmpty title={emptyTitle} description={emptyDescription} />;
   }
 
@@ -58,13 +49,21 @@ function DataTableContent<TData>({
       <DataTableCardGrid
         table={table}
         cardRenderer={config.cardRenderer}
-        isFetching={isFetching}
+        isFetching={loading}
+        skeletonCount={effectiveSkeletonRows}
         className={className}
       />
     );
   }
 
-  return <DataTable table={table} isFetching={isFetching} className={className} />;
+  return (
+    <DataTable
+      table={table}
+      isFetching={loading}
+      skeletonRows={effectiveSkeletonRows}
+      className={className}
+    />
+  );
 }
 
 export type { DataTableContentProps };

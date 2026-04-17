@@ -1,4 +1,5 @@
 // ---- Components (prop-based) ----
+export * from "./CheckboxAccordion";
 export * from "./DataTable";
 export * from "./DataTableAdvancedFilter";
 export * from "./DataTableBulkBar";
@@ -8,6 +9,7 @@ export * from "./DataTableContent";
 export * from "./DataTableContext";
 export * from "./DataTableEmpty";
 export * from "./DataTableFacetedFilter";
+export * from "./DataTableFilterBar";
 export * from "./DataTableFilterTags";
 export * from "./DataTablePagination";
 export * from "./DataTableRangeFilter";
@@ -15,10 +17,10 @@ export * from "./DataTableRoot";
 export * from "./DataTableRowActions";
 export * from "./DataTableSearch";
 export * from "./DataTableSingleFilter";
-export * from "./DataTableSkeleton";
 export * from "./DataTableToolbar";
 export * from "./DataTableViewOptions";
 export * from "./DataTableViewToggle";
+export * from "./HierarchicalCheckboxGroup";
 export * from "./selection-column";
 
 // ---- Compound composition namespace ----
@@ -26,6 +28,7 @@ import { CompoundAdvancedFilter } from "./DataTableAdvancedFilter";
 import { CompoundBulkBar } from "./DataTableBulkBar";
 import { DataTableContent } from "./DataTableContent";
 import { CompoundFilter } from "./DataTableFacetedFilter";
+import { DataTableFilterBar } from "./DataTableFilterBar";
 import { CompoundFilterTags } from "./DataTableFilterTags";
 import { CompoundPagination } from "./DataTablePagination";
 import { CompoundRangeFilter } from "./DataTableRangeFilter";
@@ -45,6 +48,7 @@ export const DT = {
   SingleFilter: CompoundSingleFilter,
   RangeFilter: CompoundRangeFilter,
   AdvancedFilter: CompoundAdvancedFilter,
+  FilterBar: DataTableFilterBar,
   FilterTags: CompoundFilterTags,
   Pagination: CompoundPagination,
   BulkBar: CompoundBulkBar,

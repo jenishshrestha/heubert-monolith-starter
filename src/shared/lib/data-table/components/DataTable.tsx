@@ -1,3 +1,5 @@
+import { Checkbox } from "@shared/components/ui/Checkbox";
+import { Skeleton } from "@shared/components/ui/Skeleton";
 import {
   Table,
   TableBody,
@@ -6,28 +8,26 @@ import {
   TableHeader,
   TableRow,
 } from "@shared/components/ui/Table";
-
 import { cn } from "@shared/lib/utils";
 import { flexRender, type Table as TanstackTable } from "@tanstack/react-table";
 
 interface DataTableProps<TData> {
   table: TanstackTable<TData>;
   isFetching?: boolean;
+  skeletonRows?: number;
   className?: string;
 }
 
-function DataTable<TData>({ table, isFetching, className }: DataTableProps<TData>) {
+function DataTable<TData>({
+  table,
+  isFetching,
+  skeletonRows = 10,
+  className,
+}: DataTableProps<TData>) {
+  const visibleColumns = table.getVisibleLeafColumns();
+
   return (
-    <div className={cn("relative rounded-md border", className)}>
-      {isFetching && (
-        <div
-          role="status"
-          aria-label="Loading"
-          className="absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/60"
-        >
-          <div className="border-primary size-5 animate-spin rounded-full border-2 border-t-transparent" />
-        </div>
-      )}
+    <div className={cn("rounded-md border", className)}>
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -43,7 +43,21 @@ function DataTable<TData>({ table, isFetching, className }: DataTableProps<TData
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows?.length ? (
+          {isFetching ? (
+            Array.from({ length: skeletonRows }).map((_, rowIndex) => (
+              <TableRow key={`skeleton-${String(rowIndex)}`}>
+                {visibleColumns.map((column) => (
+                  <TableCell key={column.id}>
+                    {column.id === "select" ? (
+                      <Checkbox disabled aria-label="Loading" />
+                    ) : (
+                      <Skeleton className="h-5 w-full max-w-52" />
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
               <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                 {row.getVisibleCells().map((cell) => (
@@ -55,7 +69,7 @@ function DataTable<TData>({ table, isFetching, className }: DataTableProps<TData
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={table.getAllColumns().length} className="h-24 text-center">
+              <TableCell colSpan={visibleColumns.length} className="h-24 text-center">
                 No results.
               </TableCell>
             </TableRow>

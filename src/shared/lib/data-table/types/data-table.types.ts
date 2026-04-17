@@ -92,6 +92,8 @@ export interface DataTableQueryParams {
   sorting: { id: string; desc: boolean }[];
   filters: { id: string; value: unknown }[];
   search?: string;
+  /** Values from the AdvancedFilter sheet, keyed by section.key */
+  advancedFilters?: Record<string, string[]>;
 }
 
 export interface DataTableServerResponse<TData> {
@@ -182,6 +184,68 @@ export interface DataTableToolbarConfig {
   columnToggle?: boolean;
 }
 
+// ---- Advanced filter config (sheet-based, multi-field) ----
+
+export interface HierarchicalFilterGroup {
+  name: string;
+  items: string[];
+}
+
+export type AdvancedFilterSection =
+  | {
+      type: "flat";
+      key: string;
+      title: string;
+      searchPlaceholder?: string;
+      defaultOpen?: boolean;
+    }
+  | {
+      type: "hierarchical";
+      key: string;
+      title: string;
+      searchPlaceholder?: string;
+      /** If absent, uses options[key] as a single flat group */
+      groupsFrom?: (options: Record<string, unknown>) => HierarchicalFilterGroup[];
+      defaultOpen?: boolean;
+    }
+  | {
+      type: "chip";
+      key: string;
+      title: string;
+      /** When true, multiple chips can be selected. Defaults to false (single-select). */
+      multi?: boolean;
+    };
+
+export type AdvancedFilterOption =
+  | string
+  | { label: string; value: string; icon?: React.ReactNode };
+
+export type AdvancedFilterOptions = Record<string, AdvancedFilterOption[]>;
+
+/** Visual grouping of sections inside the filter sheet. */
+export interface AdvancedFilterGroup {
+  title: string;
+  /** Section keys to include in this group. Order preserved. */
+  keys: string[];
+}
+
+export interface AdvancedFilterConfig {
+  sections: AdvancedFilterSection[];
+  /**
+   * Optional visual grouping. If provided, sections are rendered inside their
+   * declared groups (with a grey container + per-group Clear). Sections not
+   * listed in any group are rendered flat at the bottom. If omitted, all
+   * sections render flat (current behavior).
+   */
+  groups?: AdvancedFilterGroup[];
+  /** Async loader; DT caches via React Query when sheet opens */
+  getOptions: () => Promise<AdvancedFilterOptions>;
+  /** React Query key for options cache */
+  queryKey?: readonly unknown[];
+  /** Sync filter state to URL params (defaults to config.syncWithUrl) */
+  syncWithUrl?: boolean;
+}
+
 // ---- Main config ----
 
 export interface DataTableConfig<TData> {
@@ -194,6 +258,9 @@ export interface DataTableConfig<TData> {
 
   // Toolbar (config-driven filters + search + actions)
   toolbar?: DataTableToolbarConfig;
+
+  // Advanced filter (sheet-based, multi-field — opt-in via <DT.FilterBar />)
+  advancedFilters?: AdvancedFilterConfig;
 
   // Features
   pagination?: DataTablePaginationConfig;
@@ -222,6 +289,16 @@ export interface DataTableConfig<TData> {
 
 // ---- Hook return type ----
 
+export interface AdvancedFiltersState {
+  filters: Record<string, string[]>;
+  setSection: (key: string, values: string[]) => void;
+  setFilters: (filters: Record<string, string[]>) => void;
+  clearSection: (key: string) => void;
+  clearAll: () => void;
+  activeCount: number;
+  enabled: boolean;
+}
+
 export interface UseDataTableReturn<TData> {
   table: Table<TData>;
   isLoading: boolean;
@@ -236,4 +313,5 @@ export interface UseDataTableReturn<TData> {
   availableViews: DataTableView[];
   hasNextPage: boolean;
   hasPreviousPage: boolean;
+  advanced: AdvancedFiltersState;
 }

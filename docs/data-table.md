@@ -206,7 +206,9 @@ The `DT` namespace gives you building blocks. Wrap everything in `DT.Root`, then
 | `DT.Filter` | Multi-select checkbox filter (like "Status: Active, Inactive") | `column`, `title`, `options` |
 | `DT.SingleFilter` | Single-select radio filter (like "Gender: Male") | `column`, `title`, `options` |
 | `DT.RangeFilter` | Min/max number range filter | `column`, `title` |
-| `DT.AdvancedFilter` | Sheet-based filter panel with all filter types | None |
+| `DT.AdvancedFilter` | Sheet-based panel for column-scoped filters (legacy) | None |
+| `DT.FilterBar` | Combined search input + advanced-filter trigger button (see [Advanced Filters](#advanced-filters)) | None |
+| `DT.AdvancedFilterSheet` | Multi-section filter drawer (usually rendered by `DT.FilterBar`) | `open`, `onOpenChange` |
 | `DT.FilterTags` | Shows active filters as removable chips | None |
 | `DT.Pagination` | Page numbers + rows-per-page selector | None |
 | `DT.BulkBar` | Floating bar when rows are selected (for bulk actions) | `children` |
@@ -317,6 +319,223 @@ Override loading/empty/table rendering with a render prop:
   )}
 </DT.Content>
 ```
+
+---
+
+## Advanced Filters
+
+The advanced-filter system adds a **drawer-based, multi-section filter panel** to any table. It lives entirely inside the DataTable — state, options, URL sync, and query-key invalidation are all managed automatically.
+
+### When to use it
+
+- More than 2-3 filter dimensions (e.g., Country + Institution + Category + Level)
+- Filter options come from an API (dynamic lists)
+- You want a slide-out panel instead of inline dropdowns
+- Filters need to affect server-side pagination
+
+### Mental model
+
+1. You declare **sections** in config (`country`, `institution`, `studyLevel`, ...)
+2. You provide an **async options loader** — DT calls it and caches via React Query
+3. User opens the sheet, checks boxes — DT tracks the state
+4. Every state change bumps the query key, triggering a fresh fetch
+5. Your `queryFn` reads the current selections from `params.advancedFilters`
+
+### Step 1: Declare the filter config
+
+Add an `advancedFilters` block to your `DataTableConfig`:
+
+```typescript
+import type { DataTableConfig, AdvancedFilterConfig } from "@shared/lib/data-table/data-table.types";
+
+const advancedFilters: AdvancedFilterConfig = {
+  // Each section becomes one collapsible accordion in the sheet
+  sections: [
+    {
+      type: "flat",                         // simple checkbox list
+      key: "country",                        // this key appears in params.advancedFilters
+      title: "Country",
+      searchPlaceholder: "Search countries...",
+      defaultOpen: true,
+    },
+    {
+      type: "flat",
+      key: "institution",
+      title: "Institution",
+    },
+    {
+      type: "hierarchical",                  // parent + children with indeterminate state
+      key: "studyArea",
+      title: "Study Area",
+      groupsFrom: (options) => [
+        { name: "Business", items: ["Management", "Finance"] },
+        { name: "Sciences", items: ["Biology", "Physics"] },
+      ],
+    },
+  ],
+
+  // Async options loader. DT calls this when the sheet first opens,
+  // caches result for 10 minutes, and shares with all sections.
+  getOptions: async () => {
+    const response = await fetch("/api/products/filters");
+    const options = await response.json();
+    return {
+      country: options.countries,          // string[]
+      institution: options.institutions,
+      // Label/value pairs when display ≠ stored value:
+      studyLevel: [
+        { label: "Undergraduate", value: "undergraduate" },
+        { label: "Postgraduate",  value: "postgraduate"  },
+      ],
+    };
+  },
+
+  queryKey: ["products", "filter-options"], // optional — defaults to a generic key
+};
+
+const productsConfig: DataTableConfig<Product> = {
+  columns: [...],
+  dataSource: { mode: "server", queryFn: productsQueryFn, queryKey: ["products", "list"] },
+  advancedFilters,                          // ← wire it here
+};
+```
+
+### Step 2: Read filters in your queryFn
+
+DT passes the current filter state on `params.advancedFilters`:
+
+```typescript
+async function productsQueryFn(
+  params: DataTableQueryParams,
+): Promise<DataTableServerResponse<Product>> {
+  const filters = params.advancedFilters ?? {};
+
+  const response = await fetch("/api/products", {
+    method: "GET",
+    body: JSON.stringify({
+      page: params.page + 1,                // DT is 0-indexed; adjust for 1-indexed APIs
+      limit: params.pageSize,
+      search: params.search,
+      country: filters.country,              // string[] | undefined
+      institution: filters.institution,
+      studyArea: filters.studyArea,
+      studyLevel: filters.studyLevel,
+    }),
+  });
+
+  const json = await response.json();
+  return { data: json.data, total: json.total };
+}
+```
+
+Filters are typed as `Record<string, string[]>` — the keys match the `section.key` values from the config.
+
+### Step 3: Render the FilterBar
+
+`DT.FilterBar` is the user-facing UI. Drop it in the toolbar:
+
+```tsx
+<DT.Root config={productsConfig} className="space-y-4">
+  <DT.Toolbar className="flex items-center gap-2">
+    <DT.FilterBar searchPlaceholder="Search products..." />
+    <div className="ml-auto flex items-center gap-2">
+      <DT.ViewToggle />
+    </div>
+  </DT.Toolbar>
+  <DT.Content />
+  <DT.Pagination />
+</DT.Root>
+```
+
+`DT.FilterBar` renders:
+- A search input wired to DT's `globalFilter` state
+- A **Filters** button with active-count badge (only appears if `advancedFilters` is in config)
+- A **Clear** button that clears both search and filter selections
+
+The sheet opens on Filters click. DT renders its contents automatically from your `sections` config.
+
+### Section types
+
+#### `flat` — simple checkbox list
+
+```typescript
+{ type: "flat", key: "country", title: "Country", searchPlaceholder: "Search..." }
+```
+
+Renders: collapsible accordion with per-section search and highlighted matches.
+
+#### `hierarchical` — parent/children with indeterminate state
+
+```typescript
+{
+  type: "hierarchical",
+  key: "studyArea",
+  title: "Study Area",
+  groupsFrom: (options) => [
+    { name: "Business", items: ["Management", "Finance"] },
+    { name: "Sciences", items: ["Biology", "Physics"] },
+  ],
+}
+```
+
+Parent checkbox shows `indeterminate` state when some children are selected. Toggling the parent selects/deselects all children.
+
+If you omit `groupsFrom`, DT treats `options[key]` as a single flat group with the section title as the group name.
+
+### Programmatic access
+
+Any component inside `DT.Root` can read or modify filter state via the `useDataTableAdvancedFilters()` hook:
+
+```tsx
+import { useDataTableAdvancedFilters } from "@shared/lib/data-table";
+
+function ActiveFilterCount() {
+  const advanced = useDataTableAdvancedFilters();
+  return <span>{advanced.activeCount} filters active</span>;
+}
+
+function ClearAllButton() {
+  const advanced = useDataTableAdvancedFilters();
+  return <Button onClick={advanced.clearAll}>Clear all filters</Button>;
+}
+```
+
+Hook API:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `filters` | `Record<string, string[]>` | Current selections |
+| `activeCount` | `number` | Total selected values across all sections |
+| `setSection(key, values)` | fn | Replace a section's selections |
+| `setFilters(filters)` | fn | Replace the entire filter state |
+| `clearSection(key)` | fn | Clear one section |
+| `clearAll()` | fn | Clear everything |
+| `enabled` | `boolean` | `true` if `advancedFilters` is configured |
+
+### Options loader best practices
+
+- **Always async** — so it works with real APIs out of the box
+- **Return once** — return a single object with all sections' options (one network round trip)
+- **Cache with queryKey** — set `queryKey: ["my-feature", "filter-options"]` to share the cache across re-renders
+- **Lazy load** — options fetch only when the sheet first opens (`enabled` is keyed to `open`)
+
+### What DT does for you
+
+- Stores selection state (no page-level `useState` needed)
+- Rebuilds the React Query key on every selection change → triggers fresh data fetch
+- Caches filter options for 10 minutes via React Query
+- Resets pagination when a filter changes (so you don't land on a stale page 7)
+- Renders section UI based on `type` (no custom rendering needed for common cases)
+
+### Relationship to existing `DT.Filter` / `DT.Search`
+
+- `DT.Search` and `DT.Filter` still work — they're toolbar-level, column-scoped filters
+- `DT.FilterBar` + `advancedFilters` is a separate opt-in layer for multi-dimensional filtering
+- You can use both simultaneously: `DT.Filter` for a quick "Status" toggle, `DT.FilterBar` for deeper filtering
+
+### Full working example
+
+See `src/features/products/ProductListingPage.tsx` for a complete implementation with real mock data.
 
 ---
 
@@ -747,9 +966,11 @@ import type { DataTableConfig, DataTableColumnDef } from "@shared/lib/data-table
 1. Define your data type (`*.types.ts`)
 2. Define column definitions (`lib/columns.tsx`)
 3. Create the config (`api/*-table.config.ts`)
-4. Build the page with `DT.Root` + compound children
-5. Create a route in `app/routes/`
-6. Test: data loads, sorting works, pagination works, URL sync works
+4. If you need multi-section filtering, add an `advancedFilters` block to the config (see [Advanced Filters](#advanced-filters))
+5. Build the page with `DT.Root` + compound children
+6. If using advanced filters, drop `<DT.FilterBar />` into the toolbar
+7. Create a route in `app/routes/`
+8. Test: data loads, sorting works, pagination works, URL sync works, filter sheet opens and affects results
 
 ---
 
@@ -760,3 +981,4 @@ import type { DataTableConfig, DataTableColumnDef } from "@shared/lib/data-table
 | `/demo-showcase` | All 5 data source modes: custom provider, REST provider, API mode, client mode |
 | `/demo-table` | Headless hook approach with `mode: "api"` |
 | `/demo-table-v2` | Compound composition with `mode: "provider"` |
+| `/products` | Full example: `mode: "server"` with mock backend, advanced filters (FilterBar + sheet), card/table views, bulk actions, RBAC-gated delete |

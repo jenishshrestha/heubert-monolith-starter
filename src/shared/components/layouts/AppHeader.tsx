@@ -9,10 +9,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Github, MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
-const navLinks = [
-  { to: "/", label: "Home" },
-  { to: "/demo-showcase", label: "DataTable Showcase" },
-] as const;
+const navLinks = [{ to: "/", label: "Home" }] as const;
 
 function ThemeSwitch() {
   const { setTheme } = useTheme();
